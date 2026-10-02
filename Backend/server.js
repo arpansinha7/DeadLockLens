@@ -76,12 +76,36 @@ app.post('/allocations', async (req, res) => {
             'INSERT INTO allocations (process_id, resource_id) VALUES ($1, $2) RETURNING *',
             [process_id, resource_id]
         );
+
+        res.json(result.rows[0]);
     }
     catch(error)
     {
         console.log(error);
         res.status(500).json({
             error: 'Failed to allocate resource'
+        });
+    }
+});
+
+app.post('/requests', async (req, res) => {
+
+    try
+    {
+        const { process_id, resource_id } = req.body;
+
+        const result = await pool.query(
+            'INSERT INTO requests (process_id, resource_id) VALUES ($1, $2) RETURNING *',
+            [process_id, resource_id]
+        );
+
+        res.json(result.rows[0]);
+    }
+    catch(error)
+    {
+        console.log(error);
+        res.status(500).json({
+            error: 'Failed to create resource request'
         });
     }
 });
