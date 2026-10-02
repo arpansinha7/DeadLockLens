@@ -109,7 +109,58 @@ app.post('/requests', async (req, res) => {
         });
     }
 });
+function hasCycle(edges)
+{
+    const graph = {};
 
+    for(const edge of edges)
+    {
+        if(!graph[edge.from])
+        {
+            graph[edge.from] = [];
+        }
+
+        graph[edge.from].push(edge.to);
+    }
+
+    const visited = new Set();
+    const path = new Set();
+
+    function dfs(node)
+    {
+        if(path.has(node))
+        {
+            return true;
+        }
+        
+        if(visited.has(node))
+        {
+            return false;
+        }
+
+        visited.add(node);
+        path.add(node);
+        for(const neighbour of graph[node] || [])
+        {
+            if(dfs(neighbour))
+            {
+                return true;
+            }
+        }
+
+        path.delete(node);
+        return false;
+    }
+
+    for(const node in graph)
+    {
+        if(dfs(node))
+        {
+            return true;
+        }
+    }
+    return false;
+}
 app.get('/graph', async (req, res) => {
 
     try
@@ -162,9 +213,12 @@ app.get('/graph', async (req, res) => {
                 new Map(nodes.map(node => [node.id, node])).values()
             );
 
+            const deadlock = hasCycle(edges);
+
             res.json({
                 nodes: uniqueNodes,
-                edges
+                edges,
+                deadlock
             });
     }
     catch(error)
