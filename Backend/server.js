@@ -66,6 +66,25 @@ app.post('/resources', async (req, res) => {
     }
 });
 
+app.post('/allocations', async (req, res) => {
+
+    try
+    {
+        const { process_id, resource_id } = req.body;
+
+        const result = await pool.query(
+            'INSERT INTO allocations (process_id, resource_id) VALUES ($1, $2) RETURNING *',
+            [process_id, resource_id]
+        );
+    }
+    catch(error)
+    {
+        console.log(error);
+        res.status(500).json({
+            error: 'Failed to allocate resource'
+        });
+    }
+});
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
