@@ -42,6 +42,30 @@ app.post('/processes', async (req, res) => {
         });
     }
 });
+
+app.post('/resources', async (req, res) => {
+
+    try
+    {
+        const { name, instances } = req.body;
+
+        const result = await pool.query(
+            'INSERT INTO resources (name, instances) VALUES ($1,$2) RETURNING *',
+            [name, instances]
+        );
+
+        res.json(result.rows[0]);
+    }
+    catch(error)
+    {
+        console.log(error);
+
+        res.status(500).json({
+            error: 'Failed to create resource'
+        });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
