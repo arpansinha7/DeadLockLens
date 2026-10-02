@@ -25,9 +25,12 @@ app.post('/processes', async (req, res) => {
 
     try
     {
-        const { name } = req.body;
+        const { name, progress, rollback_cost, retry_count } = req.body;
 
-        const result = await pool.query('INSERT INTO processes (name) VALUES ($1) RETURNING *', [name]);
+        const result = await pool.query(
+            'INSERT INTO processes (name, progress, rollback_cost, retry_count ) VALUES ($1, $2, $3, $4) RETURNING *', 
+            [name, progress || 0, rollback_cost || 0, retry_count || 0]
+        );
 
         res.json(
             result.rows[0]
@@ -125,12 +128,18 @@ function hasCycle(edges)
 
     const visited = new Set();
     const path = new Set();
+    const currentPath = [];
 
     function dfs(node)
     {
         if(path.has(node))
         {
-            return true;
+            const cycleStart = currentPath.indexOf(node);
+            const cycle = currentPath.slice(cycleStart);
+
+            console.log('Cycle detected: ', cycle);
+
+            return cycle;
         }
         
         if(visited.has(node))
@@ -140,23 +149,30 @@ function hasCycle(edges)
 
         visited.add(node);
         path.add(node);
+        currentPath.push(node);
+
         for(const neighbour of graph[node] || [])
         {
-            if(dfs(neighbour))
+            const cycle = dfs(neighbour);
+
+            if(cycle)
             {
-                return true;
+                return cycle;
             }
         }
 
         path.delete(node);
+        currentPath.pop();
         return false;
     }
 
     for(const node in graph)
     {
-        if(dfs(node))
+        const cycle = dfs(node);
+
+        if(cycle)
         {
-            return true;
+            return cycle;
         }
     }
     return false;
@@ -213,12 +229,31 @@ app.get('/graph', async (req, res) => {
                 new Map(nodes.map(node => [node.id, node])).values()
             );
 
-            const deadlock = hasCycle(edges);
+            const cycle = hasCycle(edges);
+
+            const deadlockedProcesses = cycle ? cycle.filter(node => node.startsWith('P')) : [];
+
+            const processIds = deadlockedProcesses.map(
+                process => Number(process.substring(1))
+            );
+
+            const processResult = await pool.query(
+                `SELECT id, name, progress, rollback_cost, retry_count
+                 FROM processes
+                 WHERE id = ANY($1)
+                `,
+                [processIds]
+            );
+
+            console.log('Deadlocked process data: ', processResult.rows);
+            const deadlock = cycle !== false;
 
             res.json({
                 nodes: uniqueNodes,
                 edges,
-                deadlock
+                deadlock,
+                cycle,
+                deadlockedProcesses
             });
     }
     catch(error)
