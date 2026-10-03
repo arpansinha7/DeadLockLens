@@ -204,6 +204,16 @@ function canProcessFinish(processId, requestMatrix, available)
     return true;
 
 }
+async function recoverProcess(client, processId)
+{
+    await client.query(`DELETE FROM requests WHERE process_id = $1`, [processId]);
+
+    await client.query(`DELETE FROM allocations WHERE process_id = $1`, [processId]);
+
+    await client.query(`UPDATE processes SET retry_count = retry_count + 1 WHERE id = $1`, [processId]);
+
+}
+
 
 app.get('/graph', async (req, res) => {
 
@@ -372,6 +382,33 @@ app.get('/graph', async (req, res) => {
 
                 return process.protection_score < lowest.protection_score ? process : lowest;
             }) : null;
+
+            if(victim)
+            {
+                const client = await pool.connect();
+
+                try
+                {
+                    await client.query('BEGIN');
+
+                    await recoverProcess(client, victim.id);
+
+                    await client.query('COMMIT');
+
+                    console.log(`Recovery completed for process: P${victim.id}`);
+                }
+                catch(error)
+                {
+                    await client.query('ROLLBACK');
+                    console.log(`Recovery failed. Transaction rolled back`);
+
+                    throw error;
+                }
+                finally
+                {
+                    client.release();
+                }
+            }
 
             console.log('Selected victim: ', victim);
 
