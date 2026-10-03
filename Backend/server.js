@@ -177,6 +177,18 @@ function hasCycle(edges)
     }
     return false;
 }
+
+function calculateProtectionScore(process)
+{
+    const progress = process.progress / 100;
+    const rollbackCost = process.rollback_cost / 100;
+    const retryCount = Math.min(process.retry_count/3, 1);
+
+    const score = 0.4 * progress + 0.4 * rollbackCost + 0.2 * retryCount;
+
+    return score;
+}
+
 app.get('/graph', async (req, res) => {
 
     try
@@ -244,6 +256,13 @@ app.get('/graph', async (req, res) => {
                 `,
                 [processIds]
             );
+
+            const scoredProcesses = processResult.rows.map(process => ({
+                ...process,
+                protection_score: calculateProtectionScore(process)
+            }));
+
+            console.log('Scored processes: ', scoredProcesses);
 
             console.log('Deadlocked process data: ', processResult.rows);
             const deadlock = cycle !== false;
