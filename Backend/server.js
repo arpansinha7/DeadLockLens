@@ -112,6 +112,7 @@ app.post('/requests', async (req, res) => {
         });
     }
 });
+
 function hasCycle(edges)
 {
     const graph = {};
@@ -189,12 +190,123 @@ function calculateProtectionScore(process)
     return score;
 }
 
+function canProcessFinish(processId, requestMatrix, available)
+{
+    const requests = requestMatrix[processId] || {};
+
+    for(const resourceId in requests)
+    {
+        if(requests[resourceId] > (available[resourceId]|| 0))
+        {
+            return false;
+        }
+    }
+    return true;
+
+}
+
 app.get('/graph', async (req, res) => {
 
     try
     {
         const allocations = await pool.query('SELECT * FROM allocations');
         const requests = await pool.query('SELECT * FROM requests');
+        const resources = await pool.query('SELECT * FROM resources');
+
+        const available = {};
+        for(const resource of resources.rows)
+        {
+            const allocatedCount = allocations.rows.filter(
+                allocation => allocation.resource_id === resource.id
+            ).length;
+
+            available[resource.id] = resource.instances - allocatedCount;
+        }
+
+        console.log('Available resources: ', available);
+
+        const allocationMatrix = {};
+
+        for(const allocation of allocations.rows)
+        {
+            if(!allocationMatrix[allocation.process_id])
+            {
+                allocationMatrix[allocation.process_id] = {};
+            }
+
+            if(!allocationMatrix[allocation.process_id][allocation.resource_id])
+            {
+                allocationMatrix[allocation.process_id][allocation.resource_id] = 0;
+            }
+
+            allocationMatrix[allocation.process_id][allocation.resource_id]++;
+
+        }
+        
+        console.log('Allocation Matrix: ', allocationMatrix);
+
+        const requestMatrix = {};
+
+        for(const request of requests.rows)
+        {
+            if(!requestMatrix[request.process_id])
+            {
+                requestMatrix[request.process_id] = {};
+            }
+
+            if(!requestMatrix[request.process_id][request.resource_id])
+            {
+                requestMatrix[request.process_id][request.resource_id] = 0;
+            }
+
+            requestMatrix[request.process_id][request.resource_id]++;
+        }
+
+        console.log('Request Matrix: ', requestMatrix);
+
+        const processResult = await pool.query('SELECT * FROM processes');
+        const processIds = processResult.rows.map(process => process.id);
+
+        const work = {...available};
+        const finish = {};
+
+        for(const processId of processIds)
+        {
+            finish[processId] = false;
+        }
+
+        let changed = true;
+
+        while(changed)
+        {
+            changed = false;
+
+            for(const processId of processIds)
+            {
+                if(finish[processId])
+                {
+                    continue;
+                }
+
+                if(canProcessFinish(processId, requestMatrix, work))
+                {
+                    finish[processId] = true;
+
+                    for(const resourceId in allocationMatrix[processId] || {})
+                    {
+                        work[resourceId] += allocationMatrix[processId][resourceId];
+                    }
+                    changed = true;
+                }
+            }
+        }
+
+        console.log('Work after detection: ', work);
+        console.log('Finish status: ', finish);
+
+        const deadlockedProcesses = processIds.filter(processId => !finish[processId]).map(processId => `P${processId}`);
+
+        const deadlock = deadlockedProcesses.length > 0;
 
         const nodes = [];
         const edges = [];
@@ -243,29 +355,28 @@ app.get('/graph', async (req, res) => {
 
             const cycle = hasCycle(edges);
 
-            const deadlockedProcesses = cycle ? cycle.filter(node => node.startsWith('P')) : [];
+            const deadlockedProcessIds = processIds.filter(processId => !finish[processId]);
 
-            const processIds = deadlockedProcesses.map(
-                process => Number(process.substring(1))
-            );
+            const deadlockedProcessData = processResult.rows.filter(process => deadlockedProcessIds.includes(process.id));
 
-            const processResult = await pool.query(
-                `SELECT id, name, progress, rollback_cost, retry_count
-                 FROM processes
-                 WHERE id = ANY($1)
-                `,
-                [processIds]
-            );
-
-            const scoredProcesses = processResult.rows.map(process => ({
+            const scoredProcesses = deadlockedProcessData.map(process => ({
                 ...process,
                 protection_score: calculateProtectionScore(process)
             }));
 
             console.log('Scored processes: ', scoredProcesses);
 
-            console.log('Deadlocked process data: ', processResult.rows);
-            const deadlock = cycle !== false;
+            const victim = scoredProcesses.length > 0 ? 
+            
+            scoredProcesses.reduce((lowest, process) => {
+
+                return process.protection_score < lowest.protection_score ? process : lowest;
+            }) : null;
+
+            console.log('Selected victim: ', victim);
+
+            console.log('Deadlocked process data: ', deadlockedProcessData);
+
 
             res.json({
                 nodes: uniqueNodes,
