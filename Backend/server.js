@@ -1,9 +1,10 @@
 import express from 'express';
 import 'dotenv/config';
-import pool from './db.js';
+import pool, { createProcessSession } from './db.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const processSessions = new Map();
 
 app.use(express.static("public"));
 app.use(express.json());
@@ -500,6 +501,65 @@ app.get('/db/waits', async (req, res) => {
         console.error(error);
         res.status(500).json({
             error: 'Failed to fetch database waits'
+        });
+    }
+});
+
+app.post('/db/process-session', async (req, res) => {
+
+    try
+    {
+        const { processName } = req.body;
+
+        const client = await createProcessSession(processName);
+
+        processSessions.set(processName, client);
+
+        res.json({
+            message: 'Process session created',
+            processName
+        });
+    }
+    catch(error)
+    {
+        console.log(error);
+
+        res.status(500).json({
+            error: 'Failed to create process session'
+        });
+    }
+});
+
+app.post('/db/process-query', async (req, res) => {
+
+    try
+    {
+        const { processName, query } = req.body;
+
+        const client = processSessions.get(processName);
+
+        if(!client)
+        {
+            return res.status(404).json({
+                error: 'Process session not found'
+            });
+        }
+
+        const result = await client.query(query);
+
+        res.json({
+            processName,
+            command: result.command,
+            rows: result.rows
+        });
+    }
+    catch(error)
+    {
+        console.log(error);
+        res.status(500).json({
+            error: 'failed to execute process query',
+            message: error.message,
+            code: error.code
         });
     }
 });
