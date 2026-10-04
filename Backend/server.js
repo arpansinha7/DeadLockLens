@@ -432,6 +432,77 @@ app.get('/graph', async (req, res) => {
     }
 });
 
+function buildWaitForGraph(waits)
+{
+    const edges = [];
+
+    for(const wait of waits)
+    {
+        edges.push({
+            from: wait.blocked_pid,
+            to: wait.blocking_pid
+        });
+    }
+
+    return edges;
+}
+async function getDeadlockedProcesses(db, cycle)
+{
+    if(!cycle)
+    {
+        return [];
+    }
+
+    const result = await db.query(
+        `
+        SELECT pid, state, query
+        FROM pg_stat_activity
+        WHERE pid = ANY($1::int[])
+        `,
+        [cycle]
+    );
+
+    return result.rows;
+}
+app.get('/db/waits', async (req, res) => {
+
+    try
+    {
+        const result = await pool.query(`
+            SELECT
+                blocked.pid AS blocked_pid,
+                blocking.pid AS blocking_pid,
+                blocked.state AS blocked_state,
+                blocking.state AS blocking_state,
+                blocked.query AS blocked_query,
+                blocking.query AS blocking_query
+            FROM pg_stat_activity blocked
+            JOIN pg_stat_activity blocking
+                ON blocking.pid = ANY(pg_blocking_pids(blocked.pid))
+            WHERE blocked.datname = current_database();
+            `);
+
+        const edges = buildWaitForGraph(result.rows);
+        const cycle = hasCycle(edges);
+        const deadlock = cycle !== false;
+        const deadlockedProcesses = await getDeadlockedProcesses(pool, cycle);
+
+        res.json({
+            waits: result.rows,
+            edges,
+            deadlock,
+            cycle,
+            deadlockedProcesses
+        });
+    }
+    catch(error)
+    {
+        console.error(error);
+        res.status(500).json({
+            error: 'Failed to fetch database waits'
+        });
+    }
+});
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
