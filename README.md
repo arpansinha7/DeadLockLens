@@ -29,4 +29,14 @@ CREATE TABLE requests(
 	resource_id INT REFERENCES resources(id) ON DELETE CASCADE,
 	PRIMARY KEY(process_id, resource_id)
 );
+
+CREATE TABLE deadlock_events (
+    id SERIAL PRIMARY KEY,
+    detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    victim_process_id INT REFERENCES processes(id),
+    victim_pid INT,
+    protection_score DECIMAL,
+    recovery_action VARCHAR(50),
+    recovered_at TIMESTAMP
+);
 ```
