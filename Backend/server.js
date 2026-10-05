@@ -591,6 +591,36 @@ app.post('/db/process-query', async (req, res) => {
         });
     }
 });
+app.post('/db/recover', async (req, res) => {
+
+    try
+    {
+        const { pid } = req.body;
+
+        if(!pid)
+        {
+            return res.status(400).json({
+                error: 'PID is required'
+            });
+        }
+
+        const result = await pool.query(`SELECT pg_terminate_backend($1) as terminated`, [pid]);
+
+        res.json({
+            pid,
+            terminated: result.rows[0].terminated
+        });
+    }
+    catch(error)
+    {
+        console.error(error);
+
+        res.status(500).json({
+            error: 'Failed to recover transaction'
+        });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
