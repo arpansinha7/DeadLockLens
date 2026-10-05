@@ -604,11 +604,49 @@ app.post('/db/recover', async (req, res) => {
             });
         }
 
+        const process = await getDeadlockedProcesses(pool, pid);
+
+        if(!process)
+        {
+            return res.status(404).json({
+                error: 'Deadlocked process not found'
+            });
+        }
+
+        process.protection_score = calculateProtectionScore(process);
         const result = await pool.query(`SELECT pg_terminate_backend($1) as terminated`, [pid]);
+
+        if(!result.rows[0].terminated)
+        {
+            return res.status(500).json({
+                error: 'Failed to terminate process'
+            });
+        }
+
+        await pool.query(
+            `
+            UPDATE processes
+            SET retry_count = retry_count + 1
+            WHERE id = $1
+            `,
+            [process.process_id]
+        );
+
+        await pool.query(
+            `
+            INSERT INTO deadlock_events
+            (victim_process_id, victim_pid, protection_score, recovery_action, recovered_at)
+            VALUES($1, $2, $3, $4, CURRENT_TIMESTAMP)
+            `,
+            [process.process_id, pid, process.protection_score, 'terminate_backend']
+        );
 
         res.json({
             pid,
-            terminated: result.rows[0].terminated
+            processName: process.process_name,
+            terminated: true,
+            protectionScore: process.protection_score,
+            recoveryAction: 'terminate_backend'
         });
     }
     catch(error)
