@@ -1,9 +1,10 @@
 import express from 'express';
 import 'dotenv/config';
-import pool from './db.js';
+import pool, { createProcessSession } from './db.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const processSessions = new Map();
 
 app.use(express.static("public"));
 app.use(express.json());
@@ -204,6 +205,16 @@ function canProcessFinish(processId, requestMatrix, available)
     return true;
 
 }
+async function recoverProcess(client, processId)
+{
+    await client.query(`DELETE FROM requests WHERE process_id = $1`, [processId]);
+
+    await client.query(`DELETE FROM allocations WHERE process_id = $1`, [processId]);
+
+    await client.query(`UPDATE processes SET retry_count = retry_count + 1 WHERE id = $1`, [processId]);
+
+}
+
 
 app.get('/graph', async (req, res) => {
 
@@ -373,6 +384,33 @@ app.get('/graph', async (req, res) => {
                 return process.protection_score < lowest.protection_score ? process : lowest;
             }) : null;
 
+            if(victim)
+            {
+                const client = await pool.connect();
+
+                try
+                {
+                    await client.query('BEGIN');
+
+                    await recoverProcess(client, victim.id);
+
+                    await client.query('COMMIT');
+
+                    console.log(`Recovery completed for process: P${victim.id}`);
+                }
+                catch(error)
+                {
+                    await client.query('ROLLBACK');
+                    console.log(`Recovery failed. Transaction rolled back`);
+
+                    throw error;
+                }
+                finally
+                {
+                    client.release();
+                }
+            }
+
             console.log('Selected victim: ', victim);
 
             console.log('Deadlocked process data: ', deadlockedProcessData);
@@ -395,6 +433,136 @@ app.get('/graph', async (req, res) => {
     }
 });
 
+function buildWaitForGraph(waits)
+{
+    const edges = [];
+
+    for(const wait of waits)
+    {
+        edges.push({
+            from: wait.blocked_pid,
+            to: wait.blocking_pid
+        });
+    }
+
+    return edges;
+}
+async function getDeadlockedProcesses(db, cycle)
+{
+    if(!cycle)
+    {
+        return [];
+    }
+
+    const result = await db.query(
+        `
+        SELECT pid, state, query
+        FROM pg_stat_activity
+        WHERE pid = ANY($1::int[])
+        `,
+        [cycle]
+    );
+
+    return result.rows;
+}
+app.get('/db/waits', async (req, res) => {
+
+    try
+    {
+        const result = await pool.query(`
+            SELECT
+                blocked.pid AS blocked_pid,
+                blocking.pid AS blocking_pid,
+                blocked.state AS blocked_state,
+                blocking.state AS blocking_state,
+                blocked.query AS blocked_query,
+                blocking.query AS blocking_query
+            FROM pg_stat_activity blocked
+            JOIN pg_stat_activity blocking
+                ON blocking.pid = ANY(pg_blocking_pids(blocked.pid))
+            WHERE blocked.datname = current_database();
+            `);
+
+        const edges = buildWaitForGraph(result.rows);
+        const cycle = hasCycle(edges);
+        const deadlock = cycle !== false;
+        const deadlockedProcesses = await getDeadlockedProcesses(pool, cycle);
+
+        res.json({
+            waits: result.rows,
+            edges,
+            deadlock,
+            cycle,
+            deadlockedProcesses
+        });
+    }
+    catch(error)
+    {
+        console.error(error);
+        res.status(500).json({
+            error: 'Failed to fetch database waits'
+        });
+    }
+});
+
+app.post('/db/process-session', async (req, res) => {
+
+    try
+    {
+        const { processName } = req.body;
+
+        const client = await createProcessSession(processName);
+
+        processSessions.set(processName, client);
+
+        res.json({
+            message: 'Process session created',
+            processName
+        });
+    }
+    catch(error)
+    {
+        console.log(error);
+
+        res.status(500).json({
+            error: 'Failed to create process session'
+        });
+    }
+});
+
+app.post('/db/process-query', async (req, res) => {
+
+    try
+    {
+        const { processName, query } = req.body;
+
+        const client = processSessions.get(processName);
+
+        if(!client)
+        {
+            return res.status(404).json({
+                error: 'Process session not found'
+            });
+        }
+
+        const result = await client.query(query);
+
+        res.json({
+            processName,
+            command: result.command,
+            rows: result.rows
+        });
+    }
+    catch(error)
+    {
+        console.log(error);
+        res.status(500).json({
+            error: 'failed to execute process query',
+            message: error.message,
+            code: error.code
+        });
+    }
+});
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
