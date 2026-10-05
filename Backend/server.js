@@ -447,23 +447,27 @@ function buildWaitForGraph(waits)
 
     return edges;
 }
-async function getDeadlockedProcesses(db, cycle)
+async function getDeadlockedProcesses(db, pid)
 {
-    if(!cycle)
-    {
-        return [];
-    }
-
     const result = await db.query(
         `
-        SELECT pid, state, query
-        FROM pg_stat_activity
-        WHERE pid = ANY($1::int[])
+        SELECT
+            activity.pid,
+            activity.application_name,
+            p.id AS process_id,
+            p.name AS process_name,
+            p.progress,
+            p.rollback_cost,
+            p.retry_count
+        FROM pg_stat_activity AS activity
+        JOIN processes p    
+            ON activity.application_name = 'DeadlockLens-' || p.name
+        WHERE activity.pid = $1
         `,
-        [cycle]
+        [pid]
     );
 
-    return result.rows;
+    return result.rows[0];
 }
 app.get('/db/waits', async (req, res) => {
 
@@ -486,14 +490,38 @@ app.get('/db/waits', async (req, res) => {
         const edges = buildWaitForGraph(result.rows);
         const cycle = hasCycle(edges);
         const deadlock = cycle !== false;
-        const deadlockedProcesses = await getDeadlockedProcesses(pool, cycle);
+        const deadlockedProcesses = [];
+
+        if(cycle)
+        {
+            for(const pid of cycle)
+            {
+                const process = await getDeadlockedProcesses(pool, pid);
+
+                if(process)
+                {
+                    process.protection_score = calculateProtectionScore(process);
+                    deadlockedProcesses.push(process);
+                }
+            }
+        }
+
+        let victim = null;
+
+        if(deadlockedProcesses.length > 0)
+        {
+            victim = deadlockedProcesses.reduce((lowest, process) => {
+                return process.protection_score < lowest.protection_score ? process : lowest
+            });
+        }
 
         res.json({
             waits: result.rows,
             edges,
             deadlock,
             cycle,
-            deadlockedProcesses
+            deadlockedProcesses,
+            victim
         });
     }
     catch(error)
