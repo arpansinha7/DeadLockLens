@@ -514,7 +514,32 @@ app.get('/db/waits', async (req, res) => {
                 return process.protection_score < lowest.protection_score ? process : lowest
             });
         }
+        
+        if(victim)
+        {
+            const existingEvent = await pool.query(
+                `
+                SELECT id
+                FROM deadlock_events
+                WHERE victim_pid = $1
+                AND recovered_at IS NULL
+                `,
+                [victim.pid]
+            );
 
+            if(existingEvent.rows.length === 0)
+            {
+                await pool.query(`
+                    
+                    INSERT INTO deadlock_events
+                    (victim_process_id, victim_pid, protection_score, recovery_action)
+                    VALUES($1, $2, $3, $4)
+                    `,
+                    [victim.process_id, victim.pid, victim.protection_score, 'terminate_backend'
+                    ]
+                );
+            }
+        }
         res.json({
             waits: result.rows,
             edges,
@@ -634,11 +659,12 @@ app.post('/db/recover', async (req, res) => {
 
         await pool.query(
             `
-            INSERT INTO deadlock_events
-            (victim_process_id, victim_pid, protection_score, recovery_action, recovered_at)
-            VALUES($1, $2, $3, $4, CURRENT_TIMESTAMP)
+            UPDATE deadlock_events
+            SET recovered_at = CURRENT_TIMESTAMP
+            WHERE victim_pid = $1
+            AND recovered_at IS NULL
             `,
-            [process.process_id, pid, process.protection_score, 'terminate_backend']
+            [pid]
         );
 
         res.json({
