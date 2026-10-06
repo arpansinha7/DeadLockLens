@@ -27,6 +27,9 @@ export async function createProcessSession(processName)
 {
     const client = createProcessClient(processName);
 
+    client.on('error', (error) => {
+        console.error(`Process session ${processName} ended: `, error.code);
+    });
     await client.connect();
 
     return client;

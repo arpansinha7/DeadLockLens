@@ -447,23 +447,27 @@ function buildWaitForGraph(waits)
 
     return edges;
 }
-async function getDeadlockedProcesses(db, cycle)
+async function getDeadlockedProcesses(db, pid)
 {
-    if(!cycle)
-    {
-        return [];
-    }
-
     const result = await db.query(
         `
-        SELECT pid, state, query
-        FROM pg_stat_activity
-        WHERE pid = ANY($1::int[])
+        SELECT
+            activity.pid,
+            activity.application_name,
+            p.id AS process_id,
+            p.name AS process_name,
+            p.progress,
+            p.rollback_cost,
+            p.retry_count
+        FROM pg_stat_activity AS activity
+        JOIN processes p    
+            ON activity.application_name = 'DeadlockLens-' || p.name
+        WHERE activity.pid = $1
         `,
-        [cycle]
+        [pid]
     );
 
-    return result.rows;
+    return result.rows[0];
 }
 app.get('/db/waits', async (req, res) => {
 
@@ -486,14 +490,63 @@ app.get('/db/waits', async (req, res) => {
         const edges = buildWaitForGraph(result.rows);
         const cycle = hasCycle(edges);
         const deadlock = cycle !== false;
-        const deadlockedProcesses = await getDeadlockedProcesses(pool, cycle);
+        const deadlockedProcesses = [];
 
+        if(cycle)
+        {
+            for(const pid of cycle)
+            {
+                const process = await getDeadlockedProcesses(pool, pid);
+
+                if(process)
+                {
+                    process.protection_score = calculateProtectionScore(process);
+                    deadlockedProcesses.push(process);
+                }
+            }
+        }
+
+        let victim = null;
+
+        if(deadlockedProcesses.length > 0)
+        {
+            victim = deadlockedProcesses.reduce((lowest, process) => {
+                return process.protection_score < lowest.protection_score ? process : lowest
+            });
+        }
+        
+        if(victim)
+        {
+            const existingEvent = await pool.query(
+                `
+                SELECT id
+                FROM deadlock_events
+                WHERE victim_pid = $1
+                AND recovered_at IS NULL
+                `,
+                [victim.pid]
+            );
+
+            if(existingEvent.rows.length === 0)
+            {
+                await pool.query(`
+                    
+                    INSERT INTO deadlock_events
+                    (victim_process_id, victim_pid, protection_score, recovery_action)
+                    VALUES($1, $2, $3, $4)
+                    `,
+                    [victim.process_id, victim.pid, victim.protection_score, 'terminate_backend'
+                    ]
+                );
+            }
+        }
         res.json({
             waits: result.rows,
             edges,
             deadlock,
             cycle,
-            deadlockedProcesses
+            deadlockedProcesses,
+            victim
         });
     }
     catch(error)
@@ -560,6 +613,152 @@ app.post('/db/process-query', async (req, res) => {
             error: 'failed to execute process query',
             message: error.message,
             code: error.code
+        });
+    }
+});
+app.post('/db/recover', async (req, res) => {
+
+    try
+    {
+        const { pid } = req.body;
+
+        if(!pid)
+        {
+            return res.status(400).json({
+                error: 'PID is required'
+            });
+        }
+
+        const process = await getDeadlockedProcesses(pool, pid);
+
+        if(!process)
+        {
+            return res.status(404).json({
+                error: 'Deadlocked process not found'
+            });
+        }
+
+        process.protection_score = calculateProtectionScore(process);
+        const result = await pool.query(`SELECT pg_terminate_backend($1) as terminated`, [pid]);
+
+        if(!result.rows[0].terminated)
+        {
+            return res.status(500).json({
+                error: 'Failed to terminate process'
+            });
+        }
+
+        await pool.query(
+            `
+            UPDATE processes
+            SET retry_count = retry_count + 1
+            WHERE id = $1
+            `,
+            [process.process_id]
+        );
+
+        await pool.query(
+            `
+            UPDATE deadlock_events
+            SET recovered_at = CURRENT_TIMESTAMP
+            WHERE victim_pid = $1
+            AND recovered_at IS NULL
+            `,
+            [pid]
+        );
+
+        res.json({
+            pid,
+            processName: process.process_name,
+            terminated: true,
+            protectionScore: process.protection_score,
+            recoveryAction: 'terminate_backend'
+        });
+    }
+    catch(error)
+    {
+        console.error(error);
+
+        res.status(500).json({
+            error: 'Failed to recover transaction'
+        });
+    }
+});
+app.get('/deadlocks/history', async (req, res) => {
+
+    try
+    {
+        const result = await pool.query(
+            `
+            SELECT
+                de.id,
+                de.detected_at, 
+                de.victim_process_id,
+                p.name AS victim_process_name,
+                de.victim_pid,
+                de.protection_score,
+                de.recovery_action,
+                de.recovered_at
+            FROM deadlock_events AS de
+            LEFT JOIN processes AS p
+                ON p.id = de.victim_process_id
+            ORDER BY de.detected_at DESC;    
+            `
+        );
+
+        res.json({
+            events: result.rows
+        });
+    }
+    catch(error)
+    {
+        console.error(error);
+
+        res.status(500).json({
+            error: 'Failed to fetch deadlock history'
+        });
+    }
+});
+app.get('/deadlocks/analysis', async (req, res) => {
+
+    try
+    {
+        const result = await pool.query(
+            `
+            SELECT
+                COUNT(*) AS total_deadlocks,
+                COUNT(recovered_at) AS total_recoveries,
+                AVG(protection_score) AS average_protection_score
+                FROM deadlock_events;
+            `
+        );
+
+        const victimResult = await pool.query(`
+            SELECT
+                p.name AS process_name,
+                COUNT(*) AS victim_count
+            FROM deadlock_events AS de
+            JOIN processes AS p
+                ON p.id = de.victim_process_id
+            GROUP BY p.id, p.name
+            ORDER BY victim_count DESC
+            LIMIT 1;
+            `);
+
+            const analysis = result.rows[0];
+
+            res.json({
+                totalDeadlocks: Number(analysis.total_deadlocks),
+                totalRecoveries: Number(analysis.total_recoveries),
+                averageProtectionScore: analysis.average_protection_score ? Number(analysis.average_protection_score) : 0,
+                mostVictimizedProcess: victimResult.rows.length > 0 ? victimResult.rows[0].process_name : null
+            });
+    }
+    catch(error)
+    {
+        console.error(error);
+        res.status(500).json({
+            error: 'Failed to analyze deadlock history'
         });
     }
 });
