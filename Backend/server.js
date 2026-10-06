@@ -719,6 +719,49 @@ app.get('/deadlocks/history', async (req, res) => {
         });
     }
 });
+app.get('/deadlocks/analysis', async (req, res) => {
+
+    try
+    {
+        const result = await pool.query(
+            `
+            SELECT
+                COUNT(*) AS total_deadlocks,
+                COUNT(recovered_at) AS total_recoveries,
+                AVG(protection_score) AS average_protection_score
+                FROM deadlock_events;
+            `
+        );
+
+        const victimResult = await pool.query(`
+            SELECT
+                p.name AS process_name,
+                COUNT(*) AS victim_count
+            FROM deadlock_events AS de
+            JOIN processes AS p
+                ON p.id = de.victim_process_id
+            GROUP BY p.id, p.name
+            ORDER BY victim_count DESC
+            LIMIT 1;
+            `);
+
+            const analysis = result.rows[0];
+
+            res.json({
+                totalDeadlocks: Number(analysis.total_deadlocks),
+                totalRecoveries: Number(analysis.total_recoveries),
+                averageProtectionScore: analysis.average_protection_score ? Number(analysis.average_protection_score) : 0,
+                mostVictimizedProcess: victimResult.rows.length > 0 ? victimResult.rows[0].process_name : null
+            });
+    }
+    catch(error)
+    {
+        console.error(error);
+        res.status(500).json({
+            error: 'Failed to analyze deadlock history'
+        });
+    }
+});
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
