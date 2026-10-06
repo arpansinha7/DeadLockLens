@@ -3,873 +3,283 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeadlockLens - Deadlock Detection System</title>
+
+    <title>DeadlockLens</title>
 
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<div class="app">
-
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-
-        <div class="brand">
-            <div class="brand-icon">D</div>
-
-            <div>
-                <h2>DeadlockLens</h2>
-                <span>Monitoring System</span>
-            </div>
+    <!-- Header -->
+    <header>
+        <div>
+            <h1>DeadlockLens</h1>
+            <p>Database-Backed Deadlock Detection, Analysis and Recovery System</p>
         </div>
 
-        <nav class="nav">
-
-            <button class="nav-item active" onclick="showSection('overview', this)">
-                <span>◉</span>
-                Overview
-            </button>
-
-            <button class="nav-item" onclick="showSection('processes', this)">
-                <span>▣</span>
-                Processes
-            </button>
-
-            <button class="nav-item" onclick="showSection('resources', this)">
-                <span>◈</span>
-                Resources
-            </button>
-
-            <button class="nav-item" onclick="showSection('allocations', this)">
-                <span>⇄</span>
-                Allocations
-            </button>
-
-            <button class="nav-item" onclick="showSection('requests', this)">
-                <span>↗</span>
-                Requests
-            </button>
-
-            <button class="nav-item" onclick="showSection('graph', this)">
-                <span>◎</span>
-                Resource Graph
-            </button>
-
-            <button class="nav-item" onclick="showSection('recovery', this)">
-                <span>⚡</span>
-                Recovery
-            </button>
-
-        </nav>
-
-        <div class="sidebar-bottom">
-            <div class="system-status">
-                <span class="status-dot"></span>
-
-                <div>
-                    <strong>System Online</strong>
-                    <small>Monitoring active</small>
-                </div>
-            </div>
+        <div id="db-status">
+            PostgreSQL: <span id="connection-status">Connected</span>
         </div>
-
-    </aside>
-
-
-    <!-- MAIN CONTENT -->
-    <main class="main">
-
-        <!-- TOPBAR -->
-        <header class="topbar">
-
-            <div>
-                <h1>Deadlock Detection Dashboard</h1>
-                <p>Monitor processes, resources and transaction dependencies</p>
-            </div>
-
-            <div class="top-actions">
-
-                <span class="live-badge">
-                    <span class="status-dot"></span>
-                    Live Monitoring
-                </span>
-
-                <button class="refresh-btn" onclick="refreshDashboard()">
-                    ↻ Refresh
-                </button>
-
-            </div>
-
-        </header>
+    </header>
 
 
-        <!-- OVERVIEW -->
-        <section id="overview" class="section active-section">
+    <!-- Navigation -->
+    <nav>
+        <button class="nav-button active" data-section="monitor">Monitor</button>
+        <button class="nav-button" data-section="simulation">Simulation</button>
+        <button class="nav-button" data-section="history">History</button>
+        <button class="nav-button" data-section="analysis">Analysis</button>
+    </nav>
 
-            <!-- STAT CARDS -->
-            <div class="stats-grid">
 
-                <div class="stat-card">
-                    <div class="stat-top">
-                        <span>Total Processes</span>
-                        <div class="stat-icon blue">P</div>
-                    </div>
+    <main>
 
-                    <h2>8</h2>
-                    <p>Active processes</p>
+        <!-- ================= MONITOR ================= -->
+        <section id="monitor" class="section active">
+
+            <h2>Monitor</h2>
+            <p>Monitor PostgreSQL transactions and detect deadlocks.</p>
+
+
+            <!-- Status -->
+            <div class="status-row">
+
+                <div class="status-box">
+                    <h3>Deadlock Status</h3>
+                    <p id="deadlock-status">No Deadlock</p>
                 </div>
 
-
-                <div class="stat-card">
-                    <div class="stat-top">
-                        <span>Resources</span>
-                        <div class="stat-icon purple">R</div>
-                    </div>
-
-                    <h2>6</h2>
-                    <p>Tracked resources</p>
+                <div class="status-box">
+                    <h3>Active Transactions</h3>
+                    <p id="active-transactions">0</p>
                 </div>
 
-
-                <div class="stat-card">
-                    <div class="stat-top">
-                        <span>Pending Requests</span>
-                        <div class="stat-icon orange">↗</div>
-                    </div>
-
-                    <h2>4</h2>
-                    <p>Waiting requests</p>
-                </div>
-
-
-                <div class="stat-card danger-card">
-                    <div class="stat-top">
-                        <span>Deadlocks</span>
-                        <div class="stat-icon red">!</div>
-                    </div>
-
-                    <h2>1</h2>
-                    <p>Deadlock detected</p>
+                <div class="status-box">
+                    <h3>Current Victim</h3>
+                    <p id="current-victim">None</p>
                 </div>
 
             </div>
 
 
-            <!-- ALERT -->
-            <div class="deadlock-alert">
+            <!-- Graph + Details -->
+            <div class="monitor-content">
 
-                <div class="alert-icon">!</div>
+                <div class="graph-section">
+                    <h3>Wait-For Graph</h3>
 
-                <div class="alert-content">
-                    <h3>Deadlock Detected</h3>
+                    <div id="wait-for-graph"></div>
+                </div>
+
+
+                <div class="deadlock-details">
+
+                    <h3>Current Deadlock</h3>
 
                     <p>
-                        A circular dependency has been detected between
-                        multiple processes and resources.
+                        <strong>Cycle:</strong>
+                        <span id="deadlock-cycle">None</span>
                     </p>
 
-                    <div class="alert-tags">
-                        <span>P2</span>
-                        <span>P4</span>
-                        <span>P5</span>
-                    </div>
+                    <p>
+                        <strong>Victim:</strong>
+                        <span id="victim-name">None</span>
+                    </p>
+
+                    <p>
+                        <strong>Protection Score:</strong>
+                        <span id="victim-score">-</span>
+                    </p>
+
+                    <button id="recover-victim">
+                        Recover Victim
+                    </button>
+
                 </div>
 
-                <button onclick="showSection('graph')">
-                    View Graph →
+            </div>
+
+
+            <!-- Deadlocked Processes -->
+            <div class="process-section">
+
+                <h3>Deadlocked Processes</h3>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>PID</th>
+                            <th>Process</th>
+                            <th>Progress</th>
+                            <th>Rollback Cost</th>
+                            <th>Retries</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="deadlocked-processes">
+                        <!-- Filled by script.js -->
+                    </tbody>
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================= SIMULATION ================= -->
+        <section id="simulation" class="section">
+
+            <h2>Simulation</h2>
+            <p>Simulate processes, resources and resource dependencies.</p>
+
+
+            <!-- Create Process -->
+            <div class="form-section">
+
+                <h3>Create Process</h3>
+
+                <input id="process-name" type="text" placeholder="Process name">
+
+                <input id="progress" type="number" placeholder="Progress">
+
+                <input id="rollback-cost" type="number" placeholder="Rollback cost">
+
+                <input id="retry-count" type="number" placeholder="Retry count">
+
+                <button id="create-process">
+                    Create Process
                 </button>
 
             </div>
 
 
-            <!-- MAIN GRID -->
-            <div class="dashboard-grid">
+            <!-- Create Resource -->
+            <div class="form-section">
 
-                <!-- GRAPH -->
-                <div class="panel graph-panel">
+                <h3>Create Resource</h3>
 
-                    <div class="panel-header">
+                <input id="resource-name" type="text" placeholder="Resource name">
 
-                        <div>
-                            <h2>Resource Allocation Graph</h2>
-                            <p>Current process-resource dependencies</p>
-                        </div>
+                <input id="resource-instances" type="number" placeholder="Instances">
 
-                        <span class="panel-badge">
-                            Live
-                        </span>
-
-                    </div>
-
-
-                    <div class="graph-container">
-
-                        <svg viewBox="0 0 700 330">
-
-                            <defs>
-
-                                <marker
-                                    id="arrow"
-                                    markerWidth="10"
-                                    markerHeight="10"
-                                    refX="8"
-                                    refY="3"
-                                    orient="auto"
-                                >
-                                    <path d="M0,0 L0,6 L9,3 z"/>
-                                </marker>
-
-                            </defs>
-
-
-                            <!-- EDGES -->
-
-                            <line
-                                x1="150"
-                                y1="90"
-                                x2="300"
-                                y2="90"
-                                class="request-line"
-                                marker-end="url(#arrow)"
-                            />
-
-                            <line
-                                x1="400"
-                                y1="90"
-                                x2="550"
-                                y2="90"
-                                class="allocation-line"
-                                marker-end="url(#arrow)"
-                            />
-
-                            <line
-                                x1="550"
-                                y1="230"
-                                x2="400"
-                                y2="230"
-                                class="request-line"
-                                marker-end="url(#arrow)"
-                            />
-
-                            <line
-                                x1="300"
-                                y1="230"
-                                x2="150"
-                                y2="230"
-                                class="allocation-line"
-                                marker-end="url(#arrow)"
-                            />
-
-                            <line
-                                x1="150"
-                                y1="230"
-                                x2="150"
-                                y2="90"
-                                class="request-line"
-                                marker-end="url(#arrow)"
-                            />
-
-
-                            <!-- PROCESS NODES -->
-
-                            <g>
-                                <circle cx="110" cy="90" r="38" class="process-node"/>
-                                <text x="110" y="96" text-anchor="middle">P2</text>
-                            </g>
-
-
-                            <g>
-                                <circle cx="110" cy="230" r="38" class="process-node"/>
-                                <text x="110" y="236" text-anchor="middle">P4</text>
-                            </g>
-
-
-                            <g>
-                                <circle cx="590" cy="90" r="38" class="process-node"/>
-                                <text x="590" y="96" text-anchor="middle">P5</text>
-                            </g>
-
-
-                            <!-- RESOURCE NODES -->
-
-                            <g>
-                                <rect x="265" y="60" width="70" height="60" rx="10" class="resource-node"/>
-                                <text x="300" y="96" text-anchor="middle">R1</text>
-                            </g>
-
-
-                            <g>
-                                <rect x="365" y="200" width="70" height="60" rx="10" class="resource-node"/>
-                                <text x="400" y="236" text-anchor="middle">R2</text>
-                            </g>
-
-
-                            <g>
-                                <rect x="555" y="200" width="70" height="60" rx="10" class="resource-node"/>
-                                <text x="590" y="236" text-anchor="middle">R3</text>
-                            </g>
-
-                        </svg>
-
-                    </div>
-
-
-                    <div class="graph-legend">
-
-                        <span>
-                            <i class="legend-process"></i>
-                            Process
-                        </span>
-
-                        <span>
-                            <i class="legend-resource"></i>
-                            Resource
-                        </span>
-
-                        <span>
-                            <i class="legend-request"></i>
-                            Request
-                        </span>
-
-                        <span>
-                            <i class="legend-allocation"></i>
-                            Allocation
-                        </span>
-
-                    </div>
-
-                </div>
-
-
-                <!-- DETECTION SUMMARY -->
-                <div class="panel summary-panel">
-
-                    <div class="panel-header">
-                        <div>
-                            <h2>Detection Summary</h2>
-                            <p>Current system state</p>
-                        </div>
-                    </div>
-
-
-                    <div class="summary-item">
-                        <div>
-                            <span>Detection Status</span>
-                            <strong class="danger-text">Deadlock Found</strong>
-                        </div>
-
-                        <span class="summary-icon danger">!</span>
-                    </div>
-
-
-                    <div class="summary-item">
-                        <div>
-                            <span>Cycle Status</span>
-                            <strong>Cycle Present</strong>
-                        </div>
-
-                        <span class="summary-icon warning">↻</span>
-                    </div>
-
-
-                    <div class="summary-item">
-                        <div>
-                            <span>Available Resources</span>
-                            <strong>2 Units</strong>
-                        </div>
-
-                        <span class="summary-icon blue">R</span>
-                    </div>
-
-
-                    <div class="summary-item">
-                        <div>
-                            <span>Victim Candidate</span>
-                            <strong>P4</strong>
-                        </div>
-
-                        <span class="summary-icon purple">V</span>
-                    </div>
-
-
-                    <button class="full-btn" onclick="showSection('recovery')">
-                        Open Recovery Panel
-                    </button>
-
-                </div>
+                <button id="create-resource">
+                    Create Resource
+                </button>
 
             </div>
 
 
-            <!-- PROCESS TABLE -->
-            <div class="panel table-panel">
+            <!-- Allocation -->
+            <div class="form-section">
 
-                <div class="panel-header">
+                <h3>Allocate Resource</h3>
 
-                    <div>
-                        <h2>Process Activity</h2>
-                        <p>Overview of currently monitored processes</p>
-                    </div>
+                <input
+                    id="allocation-process-id"
+                    type="number"
+                    placeholder="Process ID"
+                >
 
-                    <button class="small-btn" onclick="showSection('processes')">
-                        View All
-                    </button>
+                <input
+                    id="allocation-resource-id"
+                    type="number"
+                    placeholder="Resource ID"
+                >
 
-                </div>
-
-
-                <div class="table-wrapper">
-
-                    <table>
-
-                        <thead>
-                            <tr>
-                                <th>Process</th>
-                                <th>Status</th>
-                                <th>Progress</th>
-                                <th>Rollback Cost</th>
-                                <th>Retry Count</th>
-                                <th>Protection Score</th>
-                            </tr>
-                        </thead>
-
-
-                        <tbody>
-
-                            <tr>
-                                <td>
-                                    <div class="process-name">
-                                        <span class="process-avatar">P1</span>
-                                        Process 1
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <span class="status running">Running</span>
-                                </td>
-
-                                <td>
-                                    <div class="progress-cell">
-                                        <div class="progress-bar">
-                                            <span style="width: 72%"></span>
-                                        </div>
-                                        <small>72%</small>
-                                    </div>
-                                </td>
-
-                                <td>20</td>
-                                <td>1</td>
-                                <td><strong>0.64</strong></td>
-                            </tr>
-
-
-                            <tr>
-                                <td>
-                                    <div class="process-name">
-                                        <span class="process-avatar">P2</span>
-                                        Process 2
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <span class="status blocked">Blocked</span>
-                                </td>
-
-                                <td>
-                                    <div class="progress-cell">
-                                        <div class="progress-bar">
-                                            <span style="width: 42%"></span>
-                                        </div>
-                                        <small>42%</small>
-                                    </div>
-                                </td>
-
-                                <td>35</td>
-                                <td>2</td>
-                                <td><strong>0.55</strong></td>
-                            </tr>
-
-
-                            <tr>
-                                <td>
-                                    <div class="process-name">
-                                        <span class="process-avatar">P4</span>
-                                        Process 4
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <span class="status deadlocked">Deadlocked</span>
-                                </td>
-
-                                <td>
-                                    <div class="progress-cell">
-                                        <div class="progress-bar">
-                                            <span style="width: 31%"></span>
-                                        </div>
-                                        <small>31%</small>
-                                    </div>
-                                </td>
-
-                                <td>15</td>
-                                <td>3</td>
-                                <td><strong>0.39</strong></td>
-                            </tr>
-
-
-                            <tr>
-                                <td>
-                                    <div class="process-name">
-                                        <span class="process-avatar">P5</span>
-                                        Process 5
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <span class="status blocked">Blocked</span>
-                                </td>
-
-                                <td>
-                                    <div class="progress-cell">
-                                        <div class="progress-bar">
-                                            <span style="width: 51%"></span>
-                                        </div>
-                                        <small>51%</small>
-                                    </div>
-                                </td>
-
-                                <td>28</td>
-                                <td>1</td>
-                                <td><strong>0.51</strong></td>
-                            </tr>
-
-                        </tbody>
-
-                    </table>
-
-                </div>
+                <button id="allocate-resource">
+                    Allocate
+                </button>
 
             </div>
+
+
+            <!-- Request -->
+            <div class="form-section">
+
+                <h3>Request Resource</h3>
+
+                <input
+                    id="request-process-id"
+                    type="number"
+                    placeholder="Process ID"
+                >
+
+                <input
+                    id="request-resource-id"
+                    type="number"
+                    placeholder="Resource ID"
+                >
+
+                <button id="request-resource">
+                    Request
+                </button>
+
+            </div>
+
+
+            <button id="check-deadlock">
+                Run Deadlock Detection
+            </button>
 
         </section>
 
 
-        <!-- PROCESSES -->
-        <section id="processes" class="section">
+        <!-- ================= HISTORY ================= -->
+        <section id="history" class="section">
 
-            <div class="page-heading">
-                <div>
-                    <h2>Processes</h2>
-                    <p>Manage and monitor active processes.</p>
-                </div>
+            <h2>Deadlock History</h2>
+            <p>Previously detected deadlock events.</p>
 
-                <button class="primary-btn">+ Add Process</button>
-            </div>
+            <table>
 
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Detected</th>
+                        <th>Victim</th>
+                        <th>Score</th>
+                        <th>Action</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
 
-            <div class="form-card">
+                <tbody id="history-table">
+                    <!-- Filled by script.js -->
+                </tbody>
 
-                <h3>Add Process</h3>
-
-                <div class="form-grid">
-
-                    <input type="text" placeholder="Process name">
-
-                    <input type="number" placeholder="Progress (%)">
-
-                    <input type="number" placeholder="Rollback cost">
-
-                    <input type="number" placeholder="Retry count">
-
-                </div>
-
-                <button class="primary-btn">Create Process</button>
-
-            </div>
+            </table>
 
         </section>
 
 
-        <!-- RESOURCES -->
-        <section id="resources" class="section">
+        <!-- ================= ANALYSIS ================= -->
+        <section id="analysis" class="section">
 
-            <div class="page-heading">
+            <h2>Analysis</h2>
+            <p>Deadlock statistics and recovery information.</p>
 
-                <div>
-                    <h2>Resources</h2>
-                    <p>Monitor available system resources.</p>
-                </div>
-
-                <button class="primary-btn">+ Add Resource</button>
-
-            </div>
-
-
-            <div class="form-card">
-
-                <h3>Add Resource</h3>
-
-                <div class="form-grid">
-
-                    <input type="text" placeholder="Resource name">
-
-                    <input type="number" placeholder="Number of instances">
-
-                </div>
-
-                <button class="primary-btn">Create Resource</button>
-
-            </div>
-
-        </section>
-
-
-        <!-- ALLOCATIONS -->
-        <section id="allocations" class="section">
-
-            <div class="page-heading">
+            <div class="analysis-section">
 
                 <div>
-                    <h2>Allocations</h2>
-                    <p>View resources currently allocated to processes.</p>
+                    <h3>Total Deadlocks</h3>
+                    <p id="total-deadlocks">0</p>
                 </div>
-
-            </div>
-
-
-            <div class="form-card">
-
-                <h3>Create Allocation</h3>
-
-                <div class="form-grid">
-
-                    <input type="number" placeholder="Process ID">
-
-                    <input type="number" placeholder="Resource ID">
-
-                </div>
-
-                <button class="primary-btn">Allocate Resource</button>
-
-            </div>
-
-        </section>
-
-
-        <!-- REQUESTS -->
-        <section id="requests" class="section">
-
-            <div class="page-heading">
 
                 <div>
-                    <h2>Requests</h2>
-                    <p>Monitor resource requests from processes.</p>
+                    <h3>Total Recoveries</h3>
+                    <p id="total-recoveries">0</p>
                 </div>
-
-            </div>
-
-
-            <div class="form-card">
-
-                <h3>Create Request</h3>
-
-                <div class="form-grid">
-
-                    <input type="number" placeholder="Process ID">
-
-                    <input type="number" placeholder="Resource ID">
-
-                </div>
-
-                <button class="primary-btn">Submit Request</button>
-
-            </div>
-
-        </section>
-
-
-        <!-- GRAPH -->
-        <section id="graph" class="section">
-
-            <div class="page-heading">
 
                 <div>
-                    <h2>Resource Allocation Graph</h2>
-                    <p>Visual representation of process-resource dependencies.</p>
+                    <h3>Average Protection Score</h3>
+                    <p id="average-score">0</p>
                 </div>
-
-                <span class="live-badge">
-                    ● Detection Active
-                </span>
-
-            </div>
-
-
-            <div class="panel large-graph">
-
-                <div class="graph-container">
-
-                    <svg viewBox="0 0 900 420">
-
-                        <defs>
-
-                            <marker
-                                id="arrow2"
-                                markerWidth="10"
-                                markerHeight="10"
-                                refX="8"
-                                refY="3"
-                                orient="auto"
-                            >
-                                <path d="M0,0 L0,6 L9,3 z"/>
-                            </marker>
-
-                        </defs>
-
-
-                        <line
-                            x1="180"
-                            y1="120"
-                            x2="360"
-                            y2="120"
-                            class="request-line"
-                            marker-end="url(#arrow2)"
-                        />
-
-                        <line
-                            x1="450"
-                            y1="120"
-                            x2="650"
-                            y2="120"
-                            class="allocation-line"
-                            marker-end="url(#arrow2)"
-                        />
-
-                        <line
-                            x1="650"
-                            y1="300"
-                            x2="450"
-                            y2="300"
-                            class="request-line"
-                            marker-end="url(#arrow2)"
-                        />
-
-                        <line
-                            x1="360"
-                            y1="300"
-                            x2="180"
-                            y2="300"
-                            class="allocation-line"
-                            marker-end="url(#arrow2)"
-                        />
-
-                        <line
-                            x1="180"
-                            y1="300"
-                            x2="180"
-                            y2="120"
-                            class="request-line"
-                            marker-end="url(#arrow2)"
-                        />
-
-
-                        <circle cx="130" cy="120" r="45" class="process-node"/>
-                        <text x="130" y="127" text-anchor="middle">P2</text>
-
-
-                        <circle cx="130" cy="300" r="45" class="process-node"/>
-                        <text x="130" y="307" text-anchor="middle">P4</text>
-
-
-                        <circle cx="700" cy="120" r="45" class="process-node"/>
-                        <text x="700" y="127" text-anchor="middle">P5</text>
-
-
-                        <rect x="315" y="80" width="90" height="80" rx="12" class="resource-node"/>
-                        <text x="360" y="128" text-anchor="middle">R1</text>
-
-
-                        <rect x="405" y="260" width="90" height="80" rx="12" class="resource-node"/>
-                        <text x="450" y="308" text-anchor="middle">R2</text>
-
-
-                        <rect x="655" y="260" width="90" height="80" rx="12" class="resource-node"/>
-                        <text x="700" y="308" text-anchor="middle">R3</text>
-
-                    </svg>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- RECOVERY -->
-        <section id="recovery" class="section">
-
-            <div class="page-heading">
 
                 <div>
-                    <h2>Recovery & Victim Selection</h2>
-                    <p>Review deadlocked processes and recovery candidates.</p>
-                </div>
-
-            </div>
-
-
-            <div class="recovery-grid">
-
-                <div class="panel recovery-card">
-
-                    <span class="recovery-label">Deadlocked Processes</span>
-
-                    <div class="big-number">
-                        3
-                    </div>
-
-                    <div class="recovery-processes">
-                        <span>P2</span>
-                        <span>P4</span>
-                        <span>P5</span>
-                    </div>
-
-                </div>
-
-
-                <div class="panel recovery-card">
-
-                    <span class="recovery-label">Victim Candidate</span>
-
-                    <div class="big-number purple-text">
-                        P4
-                    </div>
-
-                    <p>
-                        Selected based on the current protection score.
-                    </p>
-
-                    <button class="danger-btn">
-                        Initiate Rollback
-                    </button>
-
-                </div>
-
-
-                <div class="panel recovery-card">
-
-                    <span class="recovery-label">Recovery Status</span>
-
-                    <div class="recovery-status">
-                        <span class="status-dot"></span>
-                        Awaiting Action
-                    </div>
-
-                    <p>
-                        No recovery operation has been executed.
-                    </p>
-
+                    <h3>Most Victimized Process</h3>
+                    <p id="most-victimized">None</p>
                 </div>
 
             </div>
@@ -878,10 +288,8 @@
 
     </main>
 
-</div>
 
-
-<script src="script.js"></script>
+    <script src="script.js"></script>
 
 </body>
 </html>
