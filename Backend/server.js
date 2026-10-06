@@ -684,7 +684,41 @@ app.post('/db/recover', async (req, res) => {
         });
     }
 });
+app.get('/deadlocks/history', async (req, res) => {
 
+    try
+    {
+        const result = await pool.query(
+            `
+            SELECT
+                de.id,
+                de.detected_at, 
+                de.victim_process_id,
+                p.name AS victim_process_name,
+                de.victim_pid,
+                de.protection_score,
+                de.recovery_action,
+                de.recovered_at
+            FROM deadlock_events AS de
+            LEFT JOIN processes AS p
+                ON p.id = de.victim_process_id
+            ORDER BY de.detected_at DESC;    
+            `
+        );
+
+        res.json({
+            events: result.rows
+        });
+    }
+    catch(error)
+    {
+        console.error(error);
+
+        res.status(500).json({
+            error: 'Failed to fetch deadlock history'
+        });
+    }
+});
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
