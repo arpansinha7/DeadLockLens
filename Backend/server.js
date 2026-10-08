@@ -1,12 +1,16 @@
 import express from 'express';
 import 'dotenv/config';
 import pool, { createProcessSession } from './db.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const processSessions = new Map();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "../public")));
 app.use(express.json());
 
 
