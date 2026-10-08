@@ -270,7 +270,16 @@ button {
     background: #1d4ed8;
 }
 
+#check-deadlock:disabled {
+    background: #d1d5db;
+    border-color: #d1d5db;
+    color: #6b7280;
+    cursor: not-allowed;
+}
 
+#check-deadlock:disabled:hover {
+    background: #d1d5db;
+}
 /* =========================
    Tables
 ========================= */
