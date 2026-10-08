@@ -54,3 +54,19 @@ function refreshDashboard() {
 
     }, 700);
 }
+
+async function loadDashboard() {
+    try {
+        const response = await fetch("/graph");
+        const data = await response.json();
+
+        console.log(data);
+        document.getElementById("deadlock-status").textContent =
+        data.deadlock ? "Deadlock Detected" : "No Deadlock";
+
+    } catch (error) {
+        console.error("Error loading dashboard:", error);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", loadDashboard);
