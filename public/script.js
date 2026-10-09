@@ -35,6 +35,7 @@ const processStatus = document.getElementById('process-status');
 const resourceStatus = document.getElementById('resource-status');
 const allocationStatus = document.getElementById('allocation-status');
 const requestStatus = document.getElementById('request-status');
+const detectionMessage = document.getElementById('detection-message');
 let processCreated = false;
 let resourceCreated = false;
 let allocationCreated = false;
@@ -454,6 +455,7 @@ checkDeadlockButton.addEventListener('click', async () => {
         if(!response.ok)
         {
             console.error(data.error);
+            showStatus(detectionMessage, data.error || 'Failed to check deadlock.', 'error');
             return;
         }
 
@@ -461,12 +463,21 @@ checkDeadlockButton.addEventListener('click', async () => {
 
         if(data.deadlock)
         {
-            
+            showStatus(detectionMessage, 'Deadlock detected. Redirecting to Monitor...', 'error');
+
+            setTimeout(() => {
+                monitorNavButton.click();
+            }, 1500);
+        }
+        else
+        {
+            showStatus(detectionMessage, 'No deadlock detected.', 'success');
         }
     }
     catch(error)
     {
         console.log('Failed to check deadlock: ', error);
+        showStatus(detectionMessage, 'Failed to check deadlock. Please try again.', 'error');
     }
 });
 
