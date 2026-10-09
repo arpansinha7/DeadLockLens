@@ -488,3 +488,33 @@ input::placeholder {
 .form-status.error {
     color: #dc2626;
 }
+
+
+
+#allocation-process-id,
+#allocation-resource-id,
+#request-process-id,
+#request-resource-id {
+    width: 220px;
+    height: 36px;
+    padding: 0 18px 0px 5px;
+    border: 1px solid #cfd4da;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #111827;
+    font-family: inherit;
+    font-size: 13px;
+    box-sizing: border-box;
+    cursor: pointer;
+    margin-right: 8px;
+    margin-bottom: 8px;
+}
+
+#allocation-process-id:focus,
+#allocation-resource-id:focus,
+#request-process-id:focus,
+#request-resource-id:focus {
+    outline: none;
+    border-color: #2563eb;
+}
+
