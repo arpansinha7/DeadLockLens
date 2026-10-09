@@ -473,3 +473,18 @@ input::placeholder {
         margin-right: 0;
     }
 }
+
+
+.form-status {
+    margin-top: 10px;
+    font-size: 13px;
+    min-height: 16px;
+}
+
+.form-status.success {
+    color: #15803d;
+}
+
+.form-status.error {
+    color: #dc2626;
+}
