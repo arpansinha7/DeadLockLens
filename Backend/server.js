@@ -45,6 +45,14 @@ app.post('/processes', async (req, res) => {
     catch(error)
     {
         console.log(error);
+
+        if(error.code === '23505')
+        {
+            return res.status(409).json({
+                error: 'A process with this name already exists.'
+        });
+        }
+
         res.status(500).json({
             error: 'Failed to create process'
         });
@@ -68,6 +76,12 @@ app.post('/resources', async (req, res) => {
     {
         console.log(error);
 
+        if(error.code === '23505')
+        {
+            return res.status(409).json({
+                error: 'A resource with this name already exists.'
+            });
+        }
         res.status(500).json({
             error: 'Failed to create resource'
         });
@@ -766,6 +780,40 @@ app.get('/deadlocks/analysis', async (req, res) => {
         });
     }
 });
+
+app.get('/processes', async (req, res) => {
+
+    try
+    {
+        const result = await pool.query('SELECT id, name FROM processes ORDER BY id');
+
+        res.json(result.rows);
+    }
+    catch(error)
+    {
+        console.error(error);
+        res.status(500).json({
+            error: 'Failed to fetch processes'
+        });
+    }
+});
+
+app.get('/resources', async (req, res) => {
+
+    try
+    {
+        const result = await pool.query('SELECT id, name FROM resources ORDER BY id');
+
+        res.json(result.rows);
+    }
+    catch(error)
+    {
+        console.error(error);
+        res.status(500).json({
+            error: 'Failed to fetch resources'
+        });
+    }
+})
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
