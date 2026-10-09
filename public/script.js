@@ -41,6 +41,66 @@ let allocationCreated = false;
 let requestCreated = false;
 checkDeadlockButton.disabled = true;
 
+async function populateDropdown()
+{
+    try
+    {
+        const processResponse = await fetch('/processes');
+        const resourceResponse = await fetch('/resources');
+
+        if(!processResponse.ok || !resourceResponse.ok)
+        {
+            throw new Error('Failed to fetch processes or resources.');
+        }
+
+        const processes = await processResponse.json();
+        const resources = await resourceResponse.json();
+
+        const processDropdown = [
+            allocationProcessId,
+            requestProcessId
+        ];
+
+        const resourceDropdown = [
+            allocationResourceId,
+            requestResourceId
+        ];
+
+        processDropdown.forEach(dropdown => {
+            dropdown.replaceChildren(
+                new Option('Select a processs', '')
+            );
+
+            processes.forEach(process => {
+                dropdown.add(
+                    new Option(
+                        `${process.name} (PID: ${process.id})`, process.id
+                    )
+                );
+            });
+        });
+
+
+
+        resourceDropdown.forEach(dropdown => {
+            dropdown.replaceChildren(
+                new Option('Select a resource','')
+            );
+
+            resources.forEach(resource => {
+                dropdown.add(
+                    new Option(
+                        `${resource.name} (RID: ${resource.id})`, resource.id
+                    )
+                );
+            });            
+        });
+    }
+    catch(error)
+    {
+        console.error('Error populating dropdowns: ', error);
+    }
+}
 function showStatus(element, message, type)
 {
     element.textContent = message;
@@ -166,6 +226,29 @@ createProcessButton.addEventListener('click', async () => {
             return;
         }
 
+        const existingProcesses = await fetch('/processes');
+
+        if(!existingProcesses.ok)
+        {
+            throw new Error('Failed to fetch existing processes.');
+        }
+        const processes = await existingProcesses.json();
+
+        const processNameValue = processName.value.trim();
+
+        const processExists = processes.some(
+            process => process.name === processNameValue
+        );
+
+        if(processExists)
+        {
+            showStatus(processStatus, `Process with name ${processNameValue} is already created.`, 'error');
+
+            return;
+        }
+
+
+
         const response = await fetch('/processes', {
             method: "POST",
             headers: {
@@ -188,10 +271,11 @@ createProcessButton.addEventListener('click', async () => {
             return;
         }
 
-        showStatus(processStatus, 'Process created successfully!', 'success');
+        showStatus(processStatus, `Process ${data.name} created successfully! PID: ${data.id}`, 'success');
         processCreated = true;
         checkSimulationButton();
         console.log(data);
+        await populateDropdown();
 
     }
     catch(error)
@@ -241,10 +325,11 @@ createResourceButton.addEventListener('click', async () => {
             return;
         }
 
-        showStatus(resourceStatus, 'Resource created successfully!', 'success');
+        showStatus(resourceStatus, `Resource ${data.name} created successfully! RID:  ${data.id}`, 'success');
         resourceCreated = true;
         checkSimulationButton();
         console.log(data);
+        await populateDropdown();
     }
     catch(error)
     {
@@ -261,17 +346,17 @@ allocateResourceButton.addEventListener('click', async () => {
         const processId = Number(allocationProcessId.value);
         const resourceId = Number(allocationResourceId.value);
 
-        if(processId < 1 || processId > 100)
+        if(!Number.isInteger(processId) || processId <= 0)
         {
-            console.error('Process ID must be between 1 - 100');
-            showStatus(allocationStatus, 'Process ID must be between 1 - 100!', 'error');
+            console.error('Enter a valid Process ID.');
+            showStatus(allocationStatus, 'Enter a valid Process ID.', 'error');
             return;
         }
 
-        if(resourceId < 1 || resourceId > 100)
+        if(!Number.isInteger(resourceId) || resourceId <= 0)
         {
-            console.error('Resource ID must be between 1 - 100');
-            showStatus(allocationStatus, 'Resource ID must be between 1 - 100!', 'error');
+            console.error('Enter a valid Resource ID.');
+            showStatus(allocationStatus, 'Enter a valid Resource ID.', 'error');
             return;
         }
         const response = await fetch('/allocations', {
@@ -312,17 +397,17 @@ requestResourceButton.addEventListener('click', async () => {
         const processId = Number(requestProcessId.value);
         const resourceId = Number(requestResourceId.value);
 
-        if(processId < 1 || processId > 100)
+        if(!Number.isInteger(processId) || processId <= 0)
         {
-            console.error('Process ID must be between 1 - 100');
-            showStatus(requestStatus, 'Process ID must be between 1 - 100.', 'error');
+            console.error('Enter a valid Process ID.');
+            showStatus(requestStatus, 'Enter a valid Process ID.', 'error');
             return;
         }
 
-        if(resourceId < 1 || resourceId > 100)
+        if(!Number.isInteger(resourceId) || resourceId <= 0)
         {
-            console.error('Resource ID must be between 1 - 100');
-            showStatus(requestStatus, 'Resource ID must be between 1 - 100.', 'error');
+            console.error('Enter a valid Resource ID.');
+            showStatus(requestStatus, 'Enter a valid Resource ID.', 'error');
             return;
         }
 
