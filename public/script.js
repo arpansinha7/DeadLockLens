@@ -29,17 +29,80 @@ const totalDeadlocks = document.getElementById('total-deadlocks');
 const totalRecoveries = document.getElementById('total-recoveries');
 const averageScore = document.getElementById('average-score');
 const mostVictimized = document.getElementById('most-victimized');
+const monitorNavButton = document.querySelector('[data-section="monitor"]');
+const monitorSection = document.getElementById('monitor');
+const processStatus = document.getElementById('process-status');
+const resourceStatus = document.getElementById('resource-status');
+const allocationStatus = document.getElementById('allocation-status');
+const requestStatus = document.getElementById('request-status');
 let processCreated = false;
 let resourceCreated = false;
 let allocationCreated = false;
 let requestCreated = false;
 checkDeadlockButton.disabled = true;
 
+function showStatus(element, message, type)
+{
+    element.textContent = message;
+    element.className = `form-status ${type}`;
+}
 function checkSimulationButton()
 {
     if(processCreated && resourceCreated && allocationCreated && requestCreated)
     {
         checkDeadlockButton.disabled = false;
+    }
+    else
+    {
+        checkDeadlockButton.disabled = true;
+    }
+}
+
+async function updateMonitor()
+{
+    try
+    {
+        const response = await fetch('/db/waits');
+
+        const data = await response.json();
+
+        if(!response.ok)
+        {
+            console.error(data.error);
+            return;
+        }
+
+        console.log(data);
+ 
+        if(data.deadlock)
+        {
+            deadlockStatus.textContent = 'Deadlock Detected';
+            deadlockStatus.style.color = '#dc2626';
+        }
+        else
+        {
+            deadlockStatus.textContent = 'No Deadlock';
+            deadlockStatus.style.color = '#15803d';
+        }       
+        
+        if(data.victim)
+        {
+            currentVictim.textContent = data.victim.name ?? 'Unknown';
+
+            victimName.textContent = data.victim.name?? 'Unknown';
+
+            victimScore.textContent = data.victim.protectionScore ?? 'Unknown';
+        }
+        else
+        {
+            currentVictim.textContent = 'None';
+            victimName.textContent = 'None';
+            victimScore.textContent = 'N/A';
+        }
+    }
+    catch(error)
+    {
+        console.error('Failed to update monitor: ', error);
     }
 }
 navButtons.forEach(button => {
@@ -60,6 +123,11 @@ navButtons.forEach(button => {
         button.classList.add('active');
 
         document.getElementById(sectionId).classList.add('active');
+
+        if(sectionId === 'monitor')
+        {
+            updateMonitor();
+        }
     });
 });
 
@@ -69,7 +137,7 @@ createProcessButton.addEventListener('click', async () => {
     {
         if(processName.value.trim() === '')
         {
-            console.error('Process name is required');
+            showStatus(processStatus, 'Process name is required.', 'error');
             return;
         }
 
@@ -80,18 +148,21 @@ createProcessButton.addEventListener('click', async () => {
         if(progressValue < 0 || progressValue > 100)
         {
             console.error('Progress must be between 0-100');
+            showStatus(processStatus, 'Progress must be between 0-100.', 'error');
             return;
         }
 
         if(rollbackCostValue < 0 || rollbackCostValue > 100)
         {
             console.error('Rollback cost must be between 0-100');
+            showStatus(processStatus, 'Rollback cost must be between 0-100.', 'error');
             return;
         }
 
         if(retryCountValue < 0 || retryCountValue > 10)
         {
             console.error('Retry count must be between 0-10');
+            showStatus(processStatus, 'Retry count must be between 0-10.', 'error');
             return;
         }
 
@@ -113,9 +184,11 @@ createProcessButton.addEventListener('click', async () => {
         if(!response.ok)
         {
             console.log(data.error);
+            showStatus(processStatus, data.error || 'Failed to create process.', 'error');
             return;
         }
-        
+
+        showStatus(processStatus, 'Process created successfully!', 'success');
         processCreated = true;
         checkSimulationButton();
         console.log(data);
@@ -124,6 +197,7 @@ createProcessButton.addEventListener('click', async () => {
     catch(error)
     {
         console.error('Error creating process: ', error);
+        showStatus(processStatus, 'Error creating process.', 'error');
     }
 });
 
@@ -135,6 +209,7 @@ createResourceButton.addEventListener('click', async () => {
         if(resourceName.value.trim() === '')
         {
             console.error('Resource name is required');
+            showStatus(resourceStatus, 'Resource name is required.', 'error');
             return;
         }
 
@@ -142,6 +217,7 @@ createResourceButton.addEventListener('click', async () => {
         if(instances < 1 || instances > 10)
         {
             console.error('Resource instances must be between 1 - 10');
+            showStatus(resourceStatus, 'Resource instances must be between 1 - 10.', 'error');
             return;
         }
         const response = await fetch('/resources', {
@@ -161,8 +237,11 @@ createResourceButton.addEventListener('click', async () => {
         if(!response.ok)
         {
             console.error(data.error);
+            showStatus(resourceStatus, data.error || 'Failed to create resource', 'error');
             return;
         }
+
+        showStatus(resourceStatus, 'Resource created successfully!', 'success');
         resourceCreated = true;
         checkSimulationButton();
         console.log(data);
@@ -170,6 +249,7 @@ createResourceButton.addEventListener('click', async () => {
     catch(error)
     {
         console.error('Error creating resource: ', error);
+        showStatus(resourceStatus, 'Error creating resource.', 'error');
     }
 });
 
@@ -184,12 +264,14 @@ allocateResourceButton.addEventListener('click', async () => {
         if(processId < 1 || processId > 100)
         {
             console.error('Process ID must be between 1 - 100');
+            showStatus(allocationStatus, 'Process ID must be between 1 - 100!', 'error');
             return;
         }
 
         if(resourceId < 1 || resourceId > 100)
         {
             console.error('Resource ID must be between 1 - 100');
+            showStatus(allocationStatus, 'Resource ID must be between 1 - 100!', 'error');
             return;
         }
         const response = await fetch('/allocations', {
@@ -208,8 +290,10 @@ allocateResourceButton.addEventListener('click', async () => {
         if(!response.ok)
         {
             console.error(data.error);
+            showStatus(allocationStatus, data.error || 'Failed to create resource.', 'error');
             return;
         }
+        showStatus(allocationStatus, 'Resource allocated successfully!', 'success');
         allocationCreated = true;
         checkSimulationButton();
         console.log(data);
@@ -217,6 +301,7 @@ allocateResourceButton.addEventListener('click', async () => {
     catch(error)
     {
         console.error('Error allocating resource: ', error);
+        showStatus(allocationStatus, 'Error allocating resource.', 'error');
     }
 });
 
@@ -230,12 +315,14 @@ requestResourceButton.addEventListener('click', async () => {
         if(processId < 1 || processId > 100)
         {
             console.error('Process ID must be between 1 - 100');
+            showStatus(requestStatus, 'Process ID must be between 1 - 100.', 'error');
             return;
         }
 
         if(resourceId < 1 || resourceId > 100)
         {
             console.error('Resource ID must be between 1 - 100');
+            showStatus(requestStatus, 'Resource ID must be between 1 - 100.', 'error');
             return;
         }
 
@@ -255,8 +342,10 @@ requestResourceButton.addEventListener('click', async () => {
         if(!response.ok)
         {
             console.error(data.error);
+            showStatus(requestStatus, 'Failed to request resource.', 'error');
             return;
         }
+        showStatus(requestStatus, data.error || 'Resource requested successfully!', 'success');
         requestCreated = true;
         checkSimulationButton();
         console.log(data);
@@ -264,6 +353,7 @@ requestResourceButton.addEventListener('click', async () => {
     catch(error)
     {
         console.error('Error requesting resource: ', error);
+        showStatus(requestStatus, 'Error requesting resource', 'error');
     }
 });
 
