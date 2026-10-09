@@ -180,17 +180,15 @@
 
                 <h3>Allocate Resource</h3>
 
-                <input
-                    id="allocation-process-id"
-                    type="number"
-                    placeholder="Process ID"
-                >
+                <label for="allocation-process-id">Process</label>
+                <select id="allocation-process-id" required>
+                    <option value="" selected disabled>Select a process</option>
+                </select>
 
-                <input
-                    id="allocation-resource-id"
-                    type="number"
-                    placeholder="Resource ID"
-                >
+                <label for="allocation-resource-id">Resource</label>
+                <select id="allocation-resource-id" required>
+                    <option value="" selected disabled>Select a resource</option>
+                </select>
 
                 <button id="allocate-resource">
                     Allocate
@@ -206,17 +204,15 @@
 
                 <h3>Request Resource</h3>
 
-                <input
-                    id="request-process-id"
-                    type="number"
-                    placeholder="Process ID"
-                >
+                <label for="request-process-id">Process</label>
+                <select id="request-process-id" required>
+                    <option value="" selected disabled>Select a process</option>
+                </select>
 
-                <input
-                    id="request-resource-id"
-                    type="number"
-                    placeholder="Resource ID"
-                >
+                <label for="request-resource-id">Resource</label>
+                <select id="request-resource-id" required>
+                    <option value="" selected disabled>Select a resource</option>
+                </select>
 
                 <button id="request-resource">
                     Request
