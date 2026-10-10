@@ -153,6 +153,11 @@ async function updateMonitor()
             return;
         }
 
+        if(graphMode.value === 'simulation')
+        {
+            selectedVictim = data.deadlock ? data.victim : null;
+            recoverVictimButton.disabled = !selectedVictim;
+        }
         console.log(data);
         
         if(data.nodes)
@@ -240,7 +245,7 @@ function renderWaitForGraph(nodes, edges, cycle)
 
     nodes.forEach(node => {
         elements.push({
-            data: { id: String(node.id), label: `PID: ${node.id}`, type: node.type },
+            data: { id: String(node.id), label: `${node.type === 'process' ? 'PID' : 'RID'}: ${node.id}`, type: node.type },
             classes: cycleNodes.has(String(node.id)) ? 'cycle-node' : ''
         });
     });
@@ -637,6 +642,7 @@ checkDeadlockButton.addEventListener('click', async () => {
 
 recoverVictimButton.addEventListener('click', async () => {
 
+    console.log('Recover victim button clicked!', selectedVictim);
     if(!selectedVictim)
     {
         showStatus(detectionMessage, 'No victim selected for recovery', 'error');
