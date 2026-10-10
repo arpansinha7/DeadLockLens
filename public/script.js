@@ -37,10 +37,7 @@ const allocationStatus = document.getElementById('allocation-status');
 const requestStatus = document.getElementById('request-status');
 const detectionMessage = document.getElementById('detection-message');
 const graphMode = document.getElementById('graph-mode');
-let processCreated = false;
-let resourceCreated = false;
-let allocationCreated = false;
-let requestCreated = false;
+
 checkDeadlockButton.disabled = true;
 
 async function populateDropdown()
@@ -108,14 +105,35 @@ function showStatus(element, message, type)
     element.textContent = message;
     element.className = `form-status ${type}`;
 }
-function checkSimulationButton()
+async function checkSimulationButton()
 {
-    if(processCreated && resourceCreated && allocationCreated && requestCreated)
+    try
     {
-        checkDeadlockButton.disabled = false;
+        const processResponse = await fetch('/processes');
+        const resourceResponse = await fetch('/resources');
+        const allocationResponse = await fetch('/allocations');
+        const requestResponse = await fetch('/requests');
+
+        if(!processResponse.ok || !resourceResponse.ok || !allocationResponse.ok || !requestResponse.ok)
+        {
+            throw new Error('Failed to fetch simulation data');
+        }
+
+        const processes = await processResponse.json();
+        const resources = await resourceResponse.json();
+        const allocations = await allocationResponse.json();
+        const requests = await requestResponse.json();
+
+        checkDeadlockButton.disabled = !(
+            processes.length > 0 &&
+            resources.length > 0 &&
+            allocations.length > 0 &&
+            requests.length > 0
+        );
     }
-    else
+    catch(error)
     {
+        console.error(error);
         checkDeadlockButton.disabled = true;
     }
 }
@@ -155,7 +173,20 @@ async function updateMonitor()
         {
             deadlockStatus.textContent = 'No Deadlock';
             deadlockStatus.style.color = '#15803d';
-        }       
+        }
+        
+        deadlockCycle.textContent = data.deadlock && data.cycle?.length ? data.cycle.join(' → ') : 'None';
+
+        deadlockedProcesses.replaceChildren();
+
+        if(data.deadlock && data.deadlockedProcesses?.length)
+        {
+            data.deadlockedProcesses.forEach(process => {
+                const item = document.createElement('li');
+                item.textContent = process.name;
+                deadlockedProcesses.appendChild(item);
+            });
+        }
         
         if(data.victim)
         {
@@ -171,38 +202,31 @@ async function updateMonitor()
             victimName.textContent = 'None';
             victimScore.textContent = 'N/A';
         }
+
+        
     }
     catch(error)
     {
         console.error('Failed to update monitor: ', error);
     }
 }
+
+let waitForCy = null;
 function renderWaitForGraph(nodes, edges, cycle)
 {
+    
+    if(waitForCy)
+    {
+        waitForCy.destroy();
+    }
     const elements = [];
-
-    nodes.forEach(node => {
-        elements.push({
-            data: { id: String(node.id), label: `PID: ${node.id}`, type: node.type }
-        });
-    });
-
-    edges.forEach(edge => {
-        elements.push({
-            data: {
-                id: `${edge.from}-${edge.to}`,
-                source: String(edge.from),
-                target: String(edge.to)
-            }
-        });
-    });
 
     const cycleNodes = new Set(
         cycle ? cycle.map(String) : []
     );
 
     const cycleEdges = new Set();
-
+ 
     if(cycle && cycle.length > 1)
     {
         for(let i=0;i<cycle.length;i++)
@@ -214,7 +238,27 @@ function renderWaitForGraph(nodes, edges, cycle)
         }
     }
 
-    cytoscape({
+    nodes.forEach(node => {
+        elements.push({
+            data: { id: String(node.id), label: `PID: ${node.id}`, type: node.type },
+            classes: cycleNodes.has(String(node.id)) ? 'cycle-node' : ''
+        });
+    });
+
+    edges.forEach(edge => {
+        elements.push({
+            data: {
+                id: `${edge.from}-${edge.to}`,
+                source: String(edge.from),
+                target: String(edge.to)
+            },
+            classes: cycleEdges.has(`${edge.from}-${edge.to}`) ? 'cycle-edge' : ''
+        });
+    });
+
+
+
+    waitForCy = cytoscape({
         container: waitForGraph,
         elements,
         style: [
@@ -246,6 +290,24 @@ function renderWaitForGraph(nodes, edges, cycle)
                     'target-arrow-color': '#9ca3af',
                     'target-arrow-shape': 'triangle',
                     'curve-style': 'bezier'
+                }
+            },
+            {
+                selector: 'node.cycle-node',
+                style: {
+                    'background-color': '#dc2626',
+                    'border-width': 4,
+                    'border-color': '#991b1b',
+                    'border-opacity': 1
+                }
+            },
+            {
+                selector: 'edge.cycle-edge',
+                style: {
+                    'width': 4,
+                    'line-color': '#dc2626',
+                    'target-arrow-color': '#dc2626',
+                    'target-arrow-shape': 'triangle'
                 }
             }
         ],
@@ -533,7 +595,8 @@ requestResourceButton.addEventListener('click', async () => {
     }
 });
 
-
+let selectedVictim = null;
+recoverVictimButton.disabled = true;
 checkDeadlockButton.addEventListener('click', async () => {
 
     try
@@ -550,7 +613,8 @@ checkDeadlockButton.addEventListener('click', async () => {
         }
 
         console.log(data);
-
+        selectedVictim = data.deadlock ? data.victim : null;
+        recoverVictimButton.disabled = !selectedVictim;
         if(data.deadlock)
         {
             showStatus(detectionMessage, 'Deadlock detected. Redirecting to Monitor...', 'error');
@@ -568,6 +632,48 @@ checkDeadlockButton.addEventListener('click', async () => {
     {
         console.log('Failed to check deadlock: ', error);
         showStatus(detectionMessage, 'Failed to check deadlock. Please try again.', 'error');
+    }
+});
+
+recoverVictimButton.addEventListener('click', async () => {
+
+    if(!selectedVictim)
+    {
+        showStatus(detectionMessage, 'No victim selected for recovery', 'error');
+        return;
+    }
+    try
+    {
+        const response = await fetch('/recover', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({processId: selectedVictim.id})
+        });
+
+        const data = await response.json();
+
+        if(!response.ok)
+        {
+            showStatus(detectionMessage, data.error || 'Failed to recover victim', 'error');
+            return;
+        }
+
+        selectedVictim = null;
+        recoverVictimButton.disabled = true;
+
+        await updateMonitor();
+        
+        showStatus(detectionMessage, `Recovered process ${data.processName}`, 'success');
+
+       
+    }
+    catch(error)
+    {
+        console.error('Failed to recover victim: ', error);
+        showStatus(detectionMessage, 'Failed to recover victim. Please try again.', 'error');
+
     }
 });
 
