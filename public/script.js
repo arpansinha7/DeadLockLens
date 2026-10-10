@@ -36,6 +36,7 @@ const resourceStatus = document.getElementById('resource-status');
 const allocationStatus = document.getElementById('allocation-status');
 const requestStatus = document.getElementById('request-status');
 const detectionMessage = document.getElementById('detection-message');
+const graphMode = document.getElementById('graph-mode');
 let processCreated = false;
 let resourceCreated = false;
 let allocationCreated = false;
@@ -123,7 +124,8 @@ async function updateMonitor()
 {
     try
     {
-        const response = await fetch('/db/waits');
+        const endpoint = graphMode.value === 'simulation' ? '/graph' : '/db/waits';
+        const response = await fetch(endpoint);
 
         const data = await response.json();
 
@@ -134,6 +136,15 @@ async function updateMonitor()
         }
 
         console.log(data);
+        
+        if(data.nodes)
+        {
+            renderWaitForGraph(data.nodes, data.edges || [], data.cycle);
+        }
+        else
+        {
+            renderWaitForGraph([], data.edges || [], Array.isArray(data.cycle) ? data.cycle : []);
+        }
  
         if(data.deadlock)
         {
@@ -148,11 +159,11 @@ async function updateMonitor()
         
         if(data.victim)
         {
-            currentVictim.textContent = data.victim.name ?? 'Unknown';
+            currentVictim.textContent = data.victim.name ?? data.victim.pid ?? 'Unknown';
 
-            victimName.textContent = data.victim.name?? 'Unknown';
+            victimName.textContent = data.victim.name?? data.victim.pid ?? 'Unknown';
 
-            victimScore.textContent = data.victim.protectionScore ?? 'Unknown';
+            victimScore.textContent = data.victim.protectionScore ??  data.victim.protection_score ??'Unknown';
         }
         else
         {
@@ -165,6 +176,83 @@ async function updateMonitor()
     {
         console.error('Failed to update monitor: ', error);
     }
+}
+function renderWaitForGraph(nodes, edges, cycle)
+{
+    const elements = [];
+
+    nodes.forEach(node => {
+        elements.push({
+            data: { id: String(node.id), label: `PID: ${node.id}`, type: node.type }
+        });
+    });
+
+    edges.forEach(edge => {
+        elements.push({
+            data: {
+                id: `${edge.from}-${edge.to}`,
+                source: String(edge.from),
+                target: String(edge.to)
+            }
+        });
+    });
+
+    const cycleNodes = new Set(
+        cycle ? cycle.map(String) : []
+    );
+
+    const cycleEdges = new Set();
+
+    if(cycle && cycle.length > 1)
+    {
+        for(let i=0;i<cycle.length;i++)
+        {
+            const from = String(cycle[i]);
+            const to = String(cycle[(i+1) % cycle.length]);
+
+            cycleEdges.add(`${from}-${to}`);
+        }
+    }
+
+    cytoscape({
+        container: waitForGraph,
+        elements,
+        style: [
+            {
+                selector: 'node[type = "process"]',
+                style: {
+                    'label': 'data(label)',
+                    'background-color': '#2563eb',
+                    'color': '#1f2937',
+                    'text-valign': 'bottom',
+                    'text-margin-y': 8
+                }
+            },
+            {
+                selector: 'node[type = "resource"]',
+                style: {
+                    'label': 'data(label)',
+                    'background-color': '#0d9488',
+                    'color': '#1f2937',
+                    'text-valign': 'bottom',
+                    'text-margin-y': 8
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 2,
+                    'line-color': '#9ca3af',
+                    'target-arrow-color': '#9ca3af',
+                    'target-arrow-shape': 'triangle',
+                    'curve-style': 'bezier'
+                }
+            }
+        ],
+        layout: {
+            name: 'circle'
+        }
+    });
 }
 navButtons.forEach(button => {
 
@@ -191,7 +279,9 @@ navButtons.forEach(button => {
         }
     });
 });
-
+graphMode.addEventListener('change', () => {
+    updateMonitor();
+});
 createProcessButton.addEventListener('click', async () => {
 
     try
