@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>DeadlockLens</title>
-
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
 </head>
 
 <body>
@@ -69,6 +68,13 @@
                 <div class="graph-section">
                     <h3>Wait-For Graph</h3>
 
+                    <div id="graph-mode-container">
+                        <label for="graph-mode">Graph Source</label>
+                        <select id="graph-mode">
+                            <option value="simulation">Simulation</option>
+                            <option value="real">Real PostgreSQL Transactions</option>
+                        </select>
+                    </div>
                     <div id="wait-for-graph"></div>
                 </div>
 
