@@ -402,44 +402,21 @@ app.get('/graph', async (req, res) => {
                 return process.protection_score < lowest.protection_score ? process : lowest;
             }) : null;
 
-            if(victim)
-            {
-                const client = await pool.connect();
 
-                try
-                {
-                    await client.query('BEGIN');
-
-                    await recoverProcess(client, victim.id);
-
-                    await client.query('COMMIT');
-
-                    console.log(`Recovery completed for process: P${victim.id}`);
-                }
-                catch(error)
-                {
-                    await client.query('ROLLBACK');
-                    console.log(`Recovery failed. Transaction rolled back`);
-
-                    throw error;
-                }
-                finally
-                {
-                    client.release();
-                }
-            }
 
             console.log('Selected victim: ', victim);
 
             console.log('Deadlocked process data: ', deadlockedProcessData);
 
-
+            
+            
             res.json({
                 nodes: uniqueNodes,
                 edges,
                 deadlock,
                 cycle,
-                deadlockedProcesses
+                deadlockedProcesses: scoredProcesses,
+                victim
             });
     }
     catch(error)
@@ -558,7 +535,19 @@ app.get('/db/waits', async (req, res) => {
                 );
             }
         }
+
+        const nodes = [...new Set(
+            edges.flatMap(edge => [
+                String(edge.from),
+                String(edge.to)
+            ])
+        )].map(pid => ({
+            id: pid,
+            type: 'process'
+        }));
+        console.log('postgres victim: ', victim);
         res.json({
+            nodes,
             waits: result.rows,
             edges,
             deadlock,
