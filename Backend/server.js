@@ -3,6 +3,7 @@ import 'dotenv/config';
 import pool, { createProcessSession } from './db.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { error } from 'console';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -428,6 +429,57 @@ app.get('/graph', async (req, res) => {
     }
 });
 
+app.post('/recover', async (req, res) => {
+    const client = await pool.connect();
+
+    try
+    {
+        const { processId } = req.body;
+
+        if(!Number.isInteger(processId) || processId <= 0)
+        {
+            return res.status(400).json({
+                error: 'Process ID is required'
+            });
+        }
+
+        await client.query('BEGIN');
+
+        const result = await client.query('SELECT * FROM processes WHERE id = $1', [processId]);
+
+        if(result.rows.length === 0)
+        {
+            await client.query('ROLLBACK');
+
+            return res.status(400).json({
+                error: 'Process not found.'
+            });
+        }
+
+        await recoverProcess(client, processId);
+
+        await client.query('COMMIT');
+
+        res.json({
+            recovered: true,
+            processId,
+            processName: result.rows[0].name
+        });
+    }
+    catch(error)
+    {
+        await client.query('ROLLBACK');
+        console.error(error);
+
+        res.status(500).json({
+            error: 'Failed to recover victim process'
+        });
+    }
+    finally
+    {
+        client.release();
+    }
+});
 function buildWaitForGraph(waits)
 {
     const edges = [];
@@ -803,6 +855,42 @@ app.get('/resources', async (req, res) => {
         });
     }
 })
+
+app.get('/allocations', async (req, res) => {
+
+    try
+    {
+        const result = await pool.query('SELECT * FROM allocations');
+
+       
+        res.json(result.rows);
+    }
+    catch(error)
+    {
+        console.error(error);
+
+        res.status(500).json({
+            error:'Failed to fetch allocations'
+        });
+    }
+});
+
+app.get('/requests', async (req, res) => {
+
+    try
+    {
+        const result = await pool.query('SELECT * FROM requests');
+
+        res.json(result.rows);
+    }
+    catch(error)
+    {
+        console.error(error);
+        res.status(500).json({
+            error:'Failed to fetch requests'
+        });
+    }
+});
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
