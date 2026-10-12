@@ -533,7 +533,14 @@ app.get('/db/waits', async (req, res) => {
                 ON blocking.pid = ANY(pg_blocking_pids(blocked.pid))
             WHERE blocked.datname = current_database();
             `);
-
+        
+        const activeTransactionsResult = await pool.query(`
+                SELECT COUNT(*) AS count
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                AND application_name LIKE 'DeadlockLens-%'
+                AND xact_start IS NOT NULL
+            `)
         const edges = buildWaitForGraph(result.rows);
         const cycle = hasCycle(edges);
         const deadlock = cycle !== false;
@@ -605,7 +612,8 @@ app.get('/db/waits', async (req, res) => {
             deadlock,
             cycle,
             deadlockedProcesses,
-            victim
+            victim,
+            activeTransactions: activeTransactionsResult.rows[0].count
         });
     }
     catch(error)

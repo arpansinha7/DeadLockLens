@@ -161,6 +161,7 @@ async function updateMonitor()
         else
         {
             selectedVictim = data.deadlock ? data.victim : null;
+            activeTransactions.textContent = data.activeTransactions;
             recoverVictimButton.disabled = !selectedVictim?.pid;
         }
         console.log(data);
