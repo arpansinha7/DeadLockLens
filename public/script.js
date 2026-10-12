@@ -158,6 +158,11 @@ async function updateMonitor()
             selectedVictim = data.deadlock ? data.victim : null;
             recoverVictimButton.disabled = !selectedVictim;
         }
+        else
+        {
+            selectedVictim = data.deadlock ? data.victim : null;
+            recoverVictimButton.disabled = !selectedVictim?.pid;
+        }
         console.log(data);
         
         if(data.nodes)
@@ -650,12 +655,16 @@ recoverVictimButton.addEventListener('click', async () => {
     }
     try
     {
-        const response = await fetch('/recover', {
+        const isSimulation = graphMode.value === 'simulation';
+        const endpoint = isSimulation ? '/recover' : '/db/recover';
+        const body = isSimulation ? { processId: selectedVictim.id } : { pid: selectedVictim.pid };
+
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({processId: selectedVictim.id})
+            body: JSON.stringify(body)
         });
 
         const data = await response.json();
