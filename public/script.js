@@ -193,9 +193,23 @@ async function updateMonitor()
         if(data.deadlock && data.deadlockedProcesses?.length)
         {
             data.deadlockedProcesses.forEach(process => {
-                const item = document.createElement('li');
-                item.textContent = process.name;
-                deadlockedProcesses.appendChild(item);
+                const row = document.createElement('tr');
+                const values = [
+                    process.pid ?? process.id ?? 'N/A',
+                    process.name ?? process.process_name ?? 'N/A',
+                    process.progress ?? 'N/A',
+                    process.rollback_cost ?? 'N/A',
+                    process.retry_count ?? 'N/A',
+                    process.protectionScore ?? process.protection_score ?? 'N/A'
+                ];
+
+                values.forEach(value => {
+                    const cell = document.createElement('td');
+                    cell.textContent = value;
+                    row.appendChild(cell);
+                });
+
+                deadlockedProcesses.appendChild(row);
             });
         }
         
