@@ -542,7 +542,7 @@ allocateResourceButton.addEventListener('click', async () => {
             showStatus(allocationStatus, data.error || 'Failed to create resource.', 'error');
             return;
         }
-        showStatus(allocationStatus, 'Resource allocated successfully!', 'success');
+        showStatus(allocationStatus, `Resource ${resourceId} allocated to Process ${processId} successfully!`, 'success');
         allocationCreated = true;
         checkSimulationButton();
         console.log(data);
@@ -594,7 +594,7 @@ requestResourceButton.addEventListener('click', async () => {
             showStatus(requestStatus, 'Failed to request resource.', 'error');
             return;
         }
-        showStatus(requestStatus, data.error || 'Resource requested successfully!', 'success');
+        showStatus(requestStatus, data.error || `Process ${processId} requested Resource ${resourceId} successfully!`, 'success');
         requestCreated = true;
         checkSimulationButton();
         console.log(data);
