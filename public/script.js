@@ -364,9 +364,13 @@ navButtons.forEach(button => {
         {
             updateMonitor();
         }
-        else if(sectionId == 'history')
+        else if(sectionId === 'history')
         {
             loadHistory();
+        }
+        else if(sectionId === 'analysis')
+        {
+            loadAnalysis();
         }
     });
 });
@@ -735,7 +739,7 @@ async function loadHistory()
                 event.id,
                 new Date(event.detected_at).toLocaleString(),
                 event.victim_pid,
-                event.protection_score,
+                Number(event.protection_score).toFixed(2),
                 event.recovery_action,
                 event.recovered_at ? 'Recovered' : 'Pending'
             ];
@@ -753,5 +757,29 @@ async function loadHistory()
     {
         console.error('Failed to load history: ', error);
         
+    }
+}
+
+async function loadAnalysis()
+{
+    try
+    {
+        const response = await fetch('/analysis');
+        const data = await response.json();
+
+        if(!response.ok)
+        {
+            console.error(data.error);
+            return;
+        }
+
+        totalDeadlocks.textContent = data.totalDeadlocks;
+        totalRecoveries.textContent = data.totalRecoveries;
+        averageScore.textContent = data.averageScore === null ? 'N/A' : Number(data.averageScore).toFixed(2);
+        mostVictimized.textContent = data.mostVictimized;
+    }
+    catch(error)
+    {
+        console.error('Failed to load analysis: ', error);
     }
 }
