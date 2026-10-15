@@ -364,6 +364,10 @@ navButtons.forEach(button => {
         {
             updateMonitor();
         }
+        else if(sectionId == 'history')
+        {
+            loadHistory();
+        }
     });
 });
 graphMode.addEventListener('change', () => {
@@ -621,6 +625,7 @@ requestResourceButton.addEventListener('click', async () => {
 });
 
 let selectedVictim = null;
+let deadlockCount = 0;
 recoverVictimButton.disabled = true;
 checkDeadlockButton.addEventListener('click', async () => {
 
@@ -707,3 +712,46 @@ recoverVictimButton.addEventListener('click', async () => {
     }
 });
 
+async function loadHistory()
+{
+    try
+    {
+        const response = await fetch('/history');
+        const data = await response.json();
+
+        if(!response.ok)
+        {
+            console.error(data.error);
+            return;
+        }
+
+        historyTable.replaceChildren();
+
+        data.forEach(event => {
+
+            const row = document.createElement('tr');
+
+            const values = [
+                event.id,
+                new Date(event.detected_at).toLocaleString(),
+                event.victim_pid,
+                event.protection_score,
+                event.recovery_action,
+                event.recovered_at ? 'Recovered' : 'Pending'
+            ];
+            
+            values.forEach(value => {
+                const cell = document.createElement('td');
+                cell.textContent = value ?? 'N/A';
+                row.appendChild(cell);
+            });
+
+            historyTable.appendChild(row);
+        });
+    }
+    catch(error)
+    {
+        console.error('Failed to load history: ', error);
+        
+    }
+}
