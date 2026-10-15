@@ -168,7 +168,7 @@ async function updateMonitor()
         
         if(data.nodes)
         {
-            renderWaitForGraph(data.nodes, data.edges || [], data.cycle);
+            renderWaitForGraph(data.nodes, data.edges || [], data.deadlock ? data.cycle : []);
         }
         else
         {
