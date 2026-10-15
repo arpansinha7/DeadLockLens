@@ -899,6 +899,25 @@ app.get('/requests', async (req, res) => {
         });
     }
 });
+
+app.get('/history', async (req, res) => {
+
+    try
+    {
+        const result = await pool.query(`
+                SELECT * FROM deadlock_events ORDER BY detected_at DESC;            
+            `);
+        
+        res.json(result.rows);
+    }
+    catch(error)
+    {
+        console.error(error);
+        res.status(500).json({
+            error: 'Failed to fetch history'
+        });
+    }
+});
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
