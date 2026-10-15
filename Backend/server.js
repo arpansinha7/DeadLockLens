@@ -918,6 +918,54 @@ app.get('/history', async (req, res) => {
         });
     }
 });
+
+app.get('/analysis', async (req, res) => {
+
+    try
+    {
+        const statsResult = await pool.query(`
+
+            SELECT 
+            COUNT(*) AS total_deadlocks,
+            AVG(protection_score) as average_score
+            FROM deadlock_events;
+        `);
+
+        const recoveriesResult = await pool.query(`
+                SELECT
+                COUNT(*) AS total_recoveries
+                FROM deadlock_events
+                WHERE recovered_at IS NOT NULL;
+            `);
+
+        const victimResult = await pool.query(`
+                SELECT
+                p.name, 
+                COUNT(*) AS victim_count
+                FROM deadlock_events AS de
+                LEFT JOIN processes AS p
+                ON p.id = de.victim_process_id
+                GROUP BY p.name
+                ORDER BY victim_count DESC
+                LIMIT 1;
+            `);
+        
+        res.json({
+            totalDeadlocks: Number(statsResult.rows[0].total_deadlocks),
+            totalRecoveries: Number(recoveriesResult.rows[0].total_recoveries),
+            averageScore: statsResult.rows[0].average_score,
+            mostVictimized: victimResult.rows[0]?.name ?? 'None'
+        });
+    }
+    catch(error)
+    {
+        console.error(error);
+        res.status(500).json({
+            error: 'Failed to fetch analysis'
+        });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
