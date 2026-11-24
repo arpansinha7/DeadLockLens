@@ -3,7 +3,13 @@ A database-backed deadlock detection, analysis and recovery system.
 
 ## Project Overview
 DeadLockLens is designed to detect and visualize deadlocks between processes and resources. It provides a monitoring interface, deadlock simulation, victim selection and recovery analysis.
+## Project Objectives
 
+- Detect deadlocks between processes and resources.
+- Visualize resource allocation and waiting relationships.
+- Select a suitable victim using a protection score.
+- Support deadlock recovery.
+- Maintain deadlock history for further analysis.
 Schema
 ```sql
 CREATE TABLE processes(
