@@ -1,5 +1,8 @@
 # DeadLockLens
-A Deadlock Detection System Backed with database .
+A database-backed deadlock detection, analysis and recovery system.
+
+## Project Overview
+DeadLockLens is designed to detect and visualize deadlocks between processes and resources. It provides a monitoring interface, deadlock simulation, victim selection and recovery analysis.
 
 Schema
 ```sql
