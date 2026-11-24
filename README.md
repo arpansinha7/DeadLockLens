@@ -19,6 +19,22 @@ DeadLockLens is designed to detect and visualize deadlocks between processes and
 - Database Connectivity: node-postgres (pg)
 - Graph Visualization: Cytoscape.js
 - Version Control: Git and GitHub
+- ## System Architecture
+
+The system follows a three-layer architecture:
+
+- Presentation Layer: Handles user interaction and graph visualization.
+- Application Layer: Handles API requests, deadlock detection and victim selection.
+- Database Layer: Stores processes, resources, allocations, requests and deadlock events.
+
+## System Workflow
+
+1. Create processes and resources.
+2. Allocate resources and generate requests.
+3. Analyze resource dependencies.
+4. Detect deadlocks and visualize the graph.
+5. Select a victim using the protection score.
+6. Support recovery and maintain deadlock history.
 Schema
 ```sql
 CREATE TABLE processes(
