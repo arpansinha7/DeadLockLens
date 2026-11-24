@@ -35,6 +35,23 @@ The system follows a three-layer architecture:
 4. Detect deadlocks and visualize the graph.
 5. Select a victim using the protection score.
 6. Support recovery and maintain deadlock history.
+
+## Protection Score Algorithm
+
+The system uses a cost-aware victim selection approach to minimize the impact of deadlock recovery.
+
+### Formula
+
+S = 0.4P + 0.4R + 0.2T
+
+Where:
+
+- P = Normalized process progress
+- R = Normalized rollback cost
+- T = Normalized retry count
+- S = Protection score
+
+The process with the lowest protection score is selected as the victim. This approach considers completed work, rollback cost and previous retries during victim selection.
 Schema
 ```sql
 CREATE TABLE processes(
