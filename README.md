@@ -39,4 +39,22 @@ CREATE TABLE deadlock_events (
     recovery_action VARCHAR(50),
     recovered_at TIMESTAMP
 );
-```
+```## Documentation
+
+Detailed project documentation is available in the
+[Docs](./Docs/) directory.
+
+### Documentation Topics
+
+- [Project Overview](./Docs/project-overview.md)
+- [Database Schema](./Docs/database-schema.md)
+- [System Architecture](./Docs/system-architecture.md)
+- [Deadlock Detection](./Docs/deadlock-detection.md)
+- [Protection Score Algorithm](./Docs/protection-score.md)
+- [Recovery Mechanism](./Docs/recovery-mechanism.md)
+- [API Documentation](./Docs/api-documentation.md)
+- [Testing and Validation](./Docs/testing-and-validation.md)
+- [System Workflow](./Docs/system-workflow.md)
+- [Future Enhancements](./Docs/future-enhancements.md)
+- [Contributor Guide](./Docs/contributor-guide.md)
+- [Database Relationships](./Docs/database-relationships.md)
