@@ -54,6 +54,15 @@ Where:
 The process with the lowest protection score is selected as the victim. This approach considers completed work, rollback cost and previous retries during victim selection.
 Schema
 ```sql
+The database consists of five main tables:
+
+- **processes:** Stores process details, progress, rollback cost and retry count.
+- **resources:** Stores resource names and their total instances.
+- **allocations:** Maintains resource allocation records.
+- **requests:** Stores resource requests made by processes.
+- **deadlock_events:** Records detected deadlocks, selected victims, protection scores and recovery details.
+
+Primary keys and foreign keys are used to maintain data integrity and relationships between tables.
 CREATE TABLE processes(
 	id SERIAL PRIMARY KEY,
 	name VARCHAR(50) NOT NULL UNIQUE,
