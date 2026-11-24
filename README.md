@@ -10,6 +10,15 @@ DeadLockLens is designed to detect and visualize deadlocks between processes and
 - Select a suitable victim using a protection score.
 - Support deadlock recovery.
 - Maintain deadlock history for further analysis.
+
+  ## Technology Stack
+
+- Frontend: HTML, CSS and JavaScript
+- Backend: Node.js and Express.js
+- Database: PostgreSQL
+- Database Connectivity: node-postgres (pg)
+- Graph Visualization: Cytoscape.js
+- Version Control: Git and GitHub
 Schema
 ```sql
 CREATE TABLE processes(
