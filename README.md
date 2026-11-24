@@ -100,12 +100,4 @@ CREATE TABLE deadlock_events (
     recovered_at TIMESTAMP
 );
 
-```
-## Future Scope
 
-- Implement real-time deadlock notifications.
-- Improve victim selection using adaptive protection scores.
-- Add support for multiple database systems.
-- Introduce user authentication and role-based access.
-- Provide downloadable deadlock analysis reports.
-- Improve dashboard performance and scalability.
