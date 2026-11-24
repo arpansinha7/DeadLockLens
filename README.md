@@ -99,6 +99,8 @@ CREATE TABLE deadlock_events (
     recovery_action VARCHAR(50),
     recovered_at TIMESTAMP
 );
+
+```
 ## Future Scope
 
 - Implement real-time deadlock notifications.
@@ -107,4 +109,3 @@ CREATE TABLE deadlock_events (
 - Introduce user authentication and role-based access.
 - Provide downloadable deadlock analysis reports.
 - Improve dashboard performance and scalability.
-```
